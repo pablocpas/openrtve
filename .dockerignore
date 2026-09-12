@@ -1,0 +1,16 @@
+.git
+.gradle
+.idea
+**/build
+*.apk
+*.apkm
+*.xapk
+*.aab
+*.aar
+jadx*
+decompiled
+smali
+release.keystore
+keystore.properties
+.kotlin
+.github

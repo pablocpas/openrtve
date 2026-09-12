@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OpenRTVE</string>
+
+    <string name="tab_home">Inicio</string>
+    <string name="tab_search">Buscar</string>
+    <string name="tab_explore">Explorar</string>
+
+    <string name="search_hint">Programas, series, películas…</string>
+    <string name="search_clear">Borrar</string>
+    <string name="search_empty">No hay resultados</string>
+    <string name="search_programs">Programas</string>
+    <string name="search_videos">Vídeos</string>
+
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_playback">Reproducción</string>
+    <string name="settings_pip">Imagen en imagen al salir</string>
+    <string name="settings_pip_summary">Si sales del reproductor con un vídeo en marcha, sigue en una ventana flotante</string>
+    <string name="settings_background_audio">Audio en segundo plano</string>
+    <string name="settings_background_audio_summary">Radio y pódcasts siguen sonando al salir del reproductor</string>
+    <string name="settings_data_saver">Ahorro de datos</string>
+    <string name="settings_data_saver_summary">Limita el vídeo a 576p</string>
+    <string name="settings_subtitles">Subtítulos por defecto</string>
+    <string name="settings_subtitles_summary">Activa los subtítulos en español cuando existan</string>
+    <string name="settings_storage">Almacenamiento</string>
+    <string name="settings_clear_cache">Borrar caché</string>
+    <string name="settings_cache_size">Catálogo e imágenes: %1$s</string>
+    <string name="settings_cache_cleared">Caché borrada</string>
+    <string name="settings_about">Acerca de</string>
+    <string name="settings_version">Versión %1$s</string>
+    <string name="settings_about_summary">Cliente independiente para el catálogo público de RTVE Play. No está afiliado a RTVE.</string>
+
+    <string name="explore_topics">Temáticas</string>
+    <string name="explore_kids">Infantil</string>
+    <string name="explore_radio">Radio y pódcasts</string>
+
+    <string name="action_back">Atrás</string>
+    <string name="action_refresh">Actualizar</string>
+    <string name="action_retry">Reintentar</string>
+    <string name="action_see_all">Ver todo</string>
+
+    <string name="state_loading">Cargando…</string>
+    <string name="state_stale">Mostrando la última copia disponible</string>
+    <string name="state_empty_home">La portada no tiene módulos públicos ahora mismo</string>
+    <string name="state_empty_module">Este módulo no tiene contenidos ahora mismo</string>
+
+    <string name="error_offline">Sin conexión a Internet</string>
+    <string name="error_timeout">RTVE está tardando demasiado en responder</string>
+    <string name="error_http">RTVE respondió con un error (HTTP %1$d)</string>
+    <string name="error_unknown">No se pudo cargar el contenido</string>
+
+    <string name="blocked_geo">No disponible en tu ubicación</string>
+    <string name="blocked_login">Requiere una sesión autorizada</string>
+    <string name="blocked_paid">Requiere una suscripción activa</string>
+    <string name="blocked_no_source">Este elemento todavía no tiene una fuente reproducible</string>
+
+    <string name="kind_live">Directo</string>
+
+    <string name="program_all_seasons">Todos</string>
+    <string name="program_clips_notice">Este programa no tiene emisiones completas; se muestran sus fragmentos</string>
+    <string name="program_empty">Este programa no tiene vídeos disponibles</string>
+    <string name="program_load_more">Cargar más</string>
+
+    <string name="action_play">Reproducir</string>
+    <string name="action_open_program">Programa</string>
+    <string name="action_share">Compartir</string>
+    <string name="action_more">más</string>
+    <string name="action_less">menos</string>
+    <string name="video_genres">Género</string>
+    <string name="video_director">Dirección</string>
+    <string name="video_cast">Reparto</string>
+    <string name="video_language">Idioma original</string>
+    <string name="video_available_until">Disponible hasta</string>
+    <string name="video_program">Programa</string>
+    <string name="meta_episode">E%1$d</string>
+    <string name="meta_minutes">%1$d min</string>
+
+    <string name="player_audio_track">Pista de audio</string>
+    <string name="player_subtitles">Subtítulos</string>
+    <string name="player_speed">Velocidad</string>
+    <string name="player_aspect">Ajustar imagen</string>
+    <string name="player_pip">Imagen en imagen</string>
+    <string name="player_lock">Bloquear controles</string>
+    <string name="player_unlock">Desbloquear controles</string>
+    <string name="player_rewind">Retroceder 10 segundos</string>
+    <string name="player_forward">Avanzar 10 segundos</string>
+    <string name="player_play_pause">Reproducir o pausar</string>
+    <string name="player_live">DIRECTO</string>
+    <string name="player_go_live">IR AL DIRECTO</string>
+    <string name="player_brightness">Brillo %1$d%%</string>
+    <string name="player_volume">Volumen %1$d%%</string>
+
+    <string name="player_error_connect">No se pudo iniciar el reproductor</string>
+    <string name="player_error_nothing">No hay nada en reproducción</string>
+    <string name="player_error_geo">Este contenido no está disponible en tu ubicación</string>
+    <string name="player_error_not_found">Este contenido ya no está disponible</string>
+    <string name="player_error_offline">Sin conexión a Internet</string>
+    <string name="player_error_drm">Este dispositivo no puede reproducir el contenido protegido</string>
+    <string name="player_error_generic">No se pudo reproducir el contenido</string>
+</resources>

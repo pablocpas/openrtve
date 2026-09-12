@@ -1,0 +1,29 @@
+# Artefactos Android aportados para análisis; no se redistribuyen.
+*.apk
+*.apkm
+*.xapk
+*.aab
+*.aar
+
+# Salidas habituales de decompiladores.
+jadx/
+jadx-*/
+decompiled/
+smali/
+
+# Android / Gradle / IDE.
+.gradle/
+.idea/
+local.properties
+**/build/
+captures/
+*.iml
+
+# Firma de release: local, nunca en el repositorio.
+release.keystore
+keystore.properties
+
+# Kotlin / sistema.
+.kotlin/
+*.hprof
+.DS_Store
