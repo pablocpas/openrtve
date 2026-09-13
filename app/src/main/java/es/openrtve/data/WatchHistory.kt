@@ -21,8 +21,11 @@ data class WatchEntry(
     val positionMs: Long,
     val durationMs: Long,
     val updatedAtMillis: Long,
+    /** Visto hasta el final: fuera de "Seguir viendo", pero sirve para saber cuál es el siguiente. */
+    val finished: Boolean = false,
 ) {
     val progress: Float get() = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+    val inProgress: Boolean get() = !finished && positionMs >= WatchHistory.MIN_POSITION_MS
 }
 
 /**
@@ -45,29 +48,36 @@ class WatchHistory(
         val existing = entryFor(item.id)
         save(
             (mutableEntries.value.filterNot { it.item.id == item.id } +
-                WatchEntry(item, existing?.positionMs ?: 0L, existing?.durationMs ?: 0L, nowMillis())),
+                WatchEntry(item, existing?.positionMs ?: 0L, existing?.durationMs ?: 0L, nowMillis(), existing?.finished ?: false)),
         )
     }
 
     fun updateProgress(itemId: String, positionMs: Long, durationMs: Long) {
         val entry = entryFor(itemId) ?: return
         if (durationMs <= 0) return
-        // Terminado: fuera de la lista, como en cualquier app de streaming.
-        if (positionMs >= durationMs * FINISHED_FRACTION || positionMs < MIN_POSITION_MS) {
-            if (positionMs >= durationMs * FINISHED_FRACTION) remove(itemId)
-            return
-        }
+        val finished = positionMs >= durationMs * FINISHED_FRACTION
+        if (!finished && positionMs < MIN_POSITION_MS) return
         save(
             mutableEntries.value.filterNot { it.item.id == itemId } +
-                entry.copy(positionMs = positionMs, durationMs = durationMs, updatedAtMillis = nowMillis()),
+                entry.copy(
+                    positionMs = if (finished) durationMs else positionMs,
+                    durationMs = durationMs,
+                    updatedAtMillis = nowMillis(),
+                    finished = finished,
+                ),
         )
     }
 
     fun remove(itemId: String) = save(mutableEntries.value.filterNot { it.item.id == itemId })
 
-    /** Solo lo que tiene progreso real, lo más reciente primero. */
+    /** Solo lo empezado y no terminado, lo más reciente primero. */
     val resumable: List<WatchEntry>
-        get() = mutableEntries.value.filter { it.positionMs >= MIN_POSITION_MS }.sortedByDescending { it.updatedAtMillis }
+        get() = mutableEntries.value.filter { it.inProgress }.sortedByDescending { it.updatedAtMillis }
+
+    /** Lo último visto (a medias o entero) de un programa. */
+    fun lastWatchedOf(programId: String): WatchEntry? =
+        mutableEntries.value.filter { it.item.programId == programId && (it.inProgress || it.finished) }
+            .maxByOrNull { it.updatedAtMillis }
 
     private fun save(entries: List<WatchEntry>) {
         val trimmed = entries
@@ -104,6 +114,7 @@ class WatchHistory(
         put("positionMs", positionMs)
         put("durationMs", durationMs)
         put("updatedAt", updatedAtMillis)
+        put("finished", finished)
     }
 
     private fun JsonObject.toEntry(): WatchEntry? {
@@ -126,13 +137,19 @@ class WatchHistory(
             drm = (get("drm") as? JsonPrimitive)?.booleanOrNull ?: false,
             programId = text("programId"),
         )
-        return WatchEntry(item, long("positionMs") ?: 0L, long("durationMs") ?: 0L, long("updatedAt") ?: 0L)
+        return WatchEntry(
+            item,
+            long("positionMs") ?: 0L,
+            long("durationMs") ?: 0L,
+            long("updatedAt") ?: 0L,
+            (get("finished") as? JsonPrimitive)?.booleanOrNull ?: false,
+        )
     }
 
-    private companion object {
-        const val MAX_ENTRIES = 30
-        const val MAX_AGE_MS = 60L * 24 * 60 * 60 * 1_000
+    companion object {
+        private const val MAX_ENTRIES = 60
+        private const val MAX_AGE_MS = 60L * 24 * 60 * 60 * 1_000
         const val MIN_POSITION_MS = 30_000L
-        const val FINISHED_FRACTION = 0.95
+        private const val FINISHED_FRACTION = 0.95
     }
 }

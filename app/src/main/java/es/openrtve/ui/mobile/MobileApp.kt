@@ -138,6 +138,7 @@ fun MobileApp(container: AppContainer) {
                 )
                 is Destination.Program -> ProgramScreen(
                     repository = repository,
+                    history = container.watchHistory,
                     program = destination.item,
                     onBack = navigation::pop,
                     onOpenItem = playItem,

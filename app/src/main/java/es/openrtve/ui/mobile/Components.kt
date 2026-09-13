@@ -363,9 +363,19 @@ internal fun HeroPager(
     }
 }
 
-/** Fila de episodio: miniatura a la izquierda y título + metadatos a la derecha. */
+/**
+ * Fila de episodio: miniatura a la izquierda y título + metadatos a la derecha.
+ * [progress] pinta lo visto, [badge] ("Visto", "Siguiente") y [highlighted] resaltan.
+ */
 @Composable
-internal fun EpisodeRow(item: CatalogItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun EpisodeRow(
+    item: CatalogItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    progress: Float? = null,
+    badge: String? = null,
+    highlighted: Boolean = false,
+) {
     val context = LocalContext.current
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -373,10 +383,21 @@ internal fun EpisodeRow(item: CatalogItem, onClick: () -> Unit, modifier: Modifi
             .fillMaxWidth()
             .clip(CardShape)
             .clickable(onClick = onClick)
+            .then(if (highlighted) Modifier.background(MaterialTheme.colorScheme.surface) else Modifier)
             .padding(horizontal = ScreenPadding, vertical = 6.dp),
     ) {
-        Artwork(item.imageUrl, 16f / 9f, Modifier.width(140.dp))
+        Artwork(item.imageUrl, 16f / 9f, Modifier.width(140.dp)) {
+            progress?.let { ProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
+        }
         Column(modifier = Modifier.weight(1f)) {
+            badge?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.bodyLarge,

@@ -144,6 +144,7 @@ fun TvApp(container: AppContainer) {
                 )
                 is Destination.Program -> TvProgramScreen(
                     repository = repository,
+                    history = container.watchHistory,
                     program = destination.item,
                     onOpenItem = playItem,
                     onError = showError,

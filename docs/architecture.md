@@ -79,7 +79,9 @@ horario y el resolver lo bloquea hasta la hora.
 
 "Seguir viendo" es local (`WatchHistory`, un JSON en `filesDir`): el
 reproductor guarda la posición cada 10 s y al salir; por debajo de 30 s no
-cuenta y al 95 % se da por terminado. La portada raíz lo pinta tras el hero.
+cuenta y al 95 % el episodio pasa a "visto" (sale de la fila, pero la ficha del
+programa lo usa para proponer el siguiente: `suggestPlay`, con Reproducir /
+Continuar / Siguiente). La portada raíz pinta la fila tras el hero.
 
 Refresco como la app oficial (`refresh: 120` en su configuración): la portada se
 recarga al volver a primer plano si tiene más de dos minutos y, mientras está

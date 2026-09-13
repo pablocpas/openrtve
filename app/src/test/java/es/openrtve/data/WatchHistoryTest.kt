@@ -25,7 +25,10 @@ class WatchHistoryTest {
         assertTrue("menos de 30 s no aparece en Seguir viendo", history.resumable.none { it.item.id == "v2" })
 
         history.updateProgress("v1", positionMs = 2_900_000, durationMs = 3_000_000)
-        assertNull("al 95 % se considera terminado", history.entryFor("v1"))
+        val finished = history.entryFor("v1")!!
+        assertTrue("al 95 % se considera visto", finished.finished)
+        assertTrue(history.resumable.none { it.item.id == "v1" })
+        assertEquals("v1", history.lastWatchedOf("p1")!!.item.id)
     }
 
     @Test

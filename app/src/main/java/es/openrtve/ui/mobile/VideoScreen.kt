@@ -86,7 +86,7 @@ fun VideoScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val historyEntries by history.entries.collectAsStateWithLifecycle()
-    val resume = remember(historyEntries, state.item.id) { history.entryFor(state.item.id)?.takeIf { it.positionMs > 0 } }
+    val resume = remember(historyEntries, state.item.id) { history.entryFor(state.item.id)?.takeIf { it.inProgress } }
 
     state.error?.let { error ->
         val text = error.text(context)

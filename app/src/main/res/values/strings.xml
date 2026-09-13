@@ -65,6 +65,11 @@
     <string name="program_clips_notice">Este programa no tiene emisiones completas; se muestran sus fragmentos</string>
     <string name="program_empty">Este programa no tiene vídeos disponibles</string>
     <string name="program_load_more">Cargar más</string>
+    <string name="program_continue_episode">Continuar · %1$s</string>
+    <string name="program_next_episode">Siguiente · %1$s</string>
+    <string name="program_play_episode">Reproducir · %1$s</string>
+    <string name="episode_watched">Visto</string>
+    <string name="episode_next">Siguiente</string>
 
     <string name="action_play">Reproducir</string>
     <string name="action_open_program">Programa</string>

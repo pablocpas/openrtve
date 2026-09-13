@@ -177,6 +177,7 @@ class RtveJsonParser(
                 ?: derivedImage("p", program.text("id").orEmpty(), "imgPortada", BACKDROP_WIDTH),
             emission = program.text("emission"),
             seasons = seasons,
+            webUrl = program.text("htmlUrl")?.let(hostPolicy::sanitize),
         )
     }
 

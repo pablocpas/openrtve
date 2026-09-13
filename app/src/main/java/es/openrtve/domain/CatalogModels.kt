@@ -136,6 +136,7 @@ data class ProgramDetail(
     val imageUrl: String?,
     val emission: String?,
     val seasons: List<ProgramSeason>,
+    val webUrl: String? = null,
 )
 
 data class CatalogLoad<T>(
