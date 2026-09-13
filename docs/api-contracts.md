@@ -423,6 +423,19 @@ Sondeos con `GET` de un byte, sin seguir la redirección ni descargar contenido:
 - El HLS de un directo con DRM usa `SAMPLE-AES` + `skd://` (FairPlay): en
   Android hay que usar el MPD.
 
+### Radio (verificado el 13-09-2026)
+
+- Los episodios de un programa de radio están en `programas/{id}/audios.json`
+  (`videos.json` solo devuelve videopódcasts). El programa se reconoce por
+  `mainTopic` con prefijo `Radio/` o `htmlUrl` con `/audios/`.
+- El módulo "En directo" de la portada de radio (`moduleType=moduloDirectoRadio`)
+  llega sin `urlContent`; la fuente es `radio.secciones.directosRadio.urlContent`
+  de la configuración. `api2.rtve.es/api/lives/agr-directos/29/directos.json`
+  responde 301 a una URL `http://`: hay que elevarla a HTTPS.
+- Las emisoras llevan `audio: true`; su stream es HLS (`ztnr/{idAsset}.m3u8`),
+  así que el MIME no distingue audio de vídeo.
+- `audios/{id}.json` tiene la misma forma que `videos/{id}.json`.
+
 ## DRM y descargas
 
 | Operación | Contrato | Evidencia |

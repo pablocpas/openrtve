@@ -28,33 +28,50 @@ interface TextHttpClient {
  */
 class SafeHttpsClient(
     okHttpClient: OkHttpClient,
+    private val hostPolicy: RtveHostPolicy = RtveHostPolicy(),
     private val maxPayloadBytes: Long = 4L * 1024 * 1024,
 ) : TextHttpClient {
+    // Las redirecciones se siguen a mano: algún feed de RTVE redirige a `http://`
+    // y hay que elevarlo a HTTPS en lugar de aceptarlo o rechazarlo.
     private val client = okHttpClient.newBuilder()
+        .followRedirects(false)
         .followSslRedirects(false)
         .build()
 
     override fun fetch(url: String, etag: String?): TextResponse {
-        val request = Request.Builder()
-            .url(url)
-            .header("Accept", "application/json")
-            .header("User-Agent", USER_AGENT)
-            .apply { if (etag != null) header("If-None-Match", etag) }
-            .build()
-        client.newCall(request).execute().use { response ->
-            when {
-                response.code == 304 && etag != null -> return TextResponse(body = null, etag = etag)
-                !response.isSuccessful -> throw HttpStatusException(response.code)
+        var target = url
+        repeat(MAX_REDIRECTS + 1) { hop ->
+            val request = Request.Builder()
+                .url(target)
+                .header("Accept", "application/json")
+                .header("User-Agent", USER_AGENT)
+                .apply { if (etag != null && hop == 0) header("If-None-Match", etag) }
+                .build()
+            client.newCall(request).execute().use { response ->
+                when {
+                    response.code == 304 && etag != null -> return TextResponse(body = null, etag = etag)
+                    response.isRedirect -> {
+                        if (hop == MAX_REDIRECTS) throw IOException("Demasiadas redirecciones")
+                        val location = response.header("Location") ?: throw IOException("Redirección sin Location")
+                        target = hostPolicy.sanitize(request.url.resolve(location)?.toString() ?: location)
+                            ?: throw IOException("Redirección a un host no permitido")
+                    }
+                    !response.isSuccessful -> throw HttpStatusException(response.code)
+                    else -> {
+                        val body = response.body ?: throw IOException("Respuesta sin cuerpo")
+                        val source = body.source()
+                        if (source.request(maxPayloadBytes + 1)) throw IOException("Respuesta demasiado grande")
+                        return TextResponse(body = source.readUtf8(), etag = response.header("ETag"))
+                    }
+                }
             }
-            val body = response.body ?: throw IOException("Respuesta sin cuerpo")
-            val source = body.source()
-            if (source.request(maxPayloadBytes + 1)) throw IOException("Respuesta demasiado grande")
-            return TextResponse(body = source.readUtf8(), etag = response.header("ETag"))
         }
+        throw IOException("No se pudo completar la petición")
     }
 
     companion object {
         const val USER_AGENT = "OpenRTVE-Android/0.2"
+        private const val MAX_REDIRECTS = 3
 
         /** Cliente base de la app: timeouts y allowlist en cada salto. Lo comparten catálogo e imágenes. */
         fun buildOkHttpClient(hostPolicy: RtveHostPolicy): OkHttpClient = OkHttpClient.Builder()

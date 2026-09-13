@@ -32,6 +32,12 @@ interface CatalogRepository {
     suspend fun loadProgram(programId: String, forceRefresh: Boolean = false): CatalogLoad<ProgramDetail>
     suspend fun loadVideo(videoId: String, forceRefresh: Boolean = false): CatalogLoad<VideoDetail>
 
+    /** Ficha de un audio (`audios/{id}.json`), con la misma forma que la de vídeo. */
+    suspend fun loadAudio(audioId: String, forceRefresh: Boolean = false): CatalogLoad<VideoDetail>
+
+    /** Episodios de un programa de radio (`programas/{id}/audios.json`). */
+    suspend fun loadProgramAudios(programId: String, page: Int = 1, forceRefresh: Boolean = false): CatalogLoad<CatalogPage>
+
     /** Siguiente episodio según RTVE (`videos/{id}/next.json`), o `null` si no hay. */
     suspend fun loadNextVideo(videoId: String): CatalogItem?
 
@@ -61,14 +67,35 @@ class DefaultCatalogRepository(
         url: String,
         forceRefresh: Boolean,
         cachedOnly: Boolean,
-    ): CatalogLoad<HomeFeed> = loadDocument(
-        url = url,
-        forceRefresh = forceRefresh,
-        freshForMillis = HOME_FRESH_MS,
-        staleForMillis = HOME_STALE_MS,
-        cachedOnly = cachedOnly,
-        parse = parser::parseHome,
-    )
+    ): CatalogLoad<HomeFeed> {
+        val feed = loadDocument(
+            url = url,
+            forceRefresh = forceRefresh,
+            freshForMillis = HOME_FRESH_MS,
+            staleForMillis = HOME_STALE_MS,
+            cachedOnly = cachedOnly,
+            parse = parser::parseHome,
+        )
+        // El módulo de emisoras de radio no trae fuente: se toma de la configuración remota.
+        if (feed.value.rows.none { it.isRadioLivesModule && it.contentUrl == null }) return feed
+        val livesUrl = runCatching {
+            loadDocument(
+                url = RtveUrls.REMOTE_CONFIG,
+                forceRefresh = false,
+                freshForMillis = CONFIG_FRESH_MS,
+                staleForMillis = CONFIG_STALE_MS,
+                cachedOnly = cachedOnly,
+                parse = parser::parseRadioLivesUrl,
+            ).value
+        }.getOrNull() ?: return feed
+        return feed.copy(
+            value = feed.value.copy(
+                rows = feed.value.rows.map { row ->
+                    if (row.isRadioLivesModule && row.contentUrl == null) row.copy(contentUrl = livesUrl) else row
+                },
+            ),
+        )
+    }
 
     override suspend fun loadExplore(forceRefresh: Boolean): CatalogLoad<List<ExploreGroup>> = loadDocument(
         url = RtveUrls.REMOTE_CONFIG,
@@ -136,6 +163,29 @@ class DefaultCatalogRepository(
         freshForMillis = PROGRAM_FRESH_MS,
         staleForMillis = PROGRAM_STALE_MS,
         parse = parser::parseVideo,
+    )
+
+    override suspend fun loadAudio(
+        audioId: String,
+        forceRefresh: Boolean,
+    ): CatalogLoad<VideoDetail> = loadDocument(
+        url = "$AUDIOS_BASE/${encode(audioId)}.json",
+        forceRefresh = forceRefresh,
+        freshForMillis = PROGRAM_FRESH_MS,
+        staleForMillis = PROGRAM_STALE_MS,
+        parse = parser::parseVideo,
+    )
+
+    override suspend fun loadProgramAudios(
+        programId: String,
+        page: Int,
+        forceRefresh: Boolean,
+    ): CatalogLoad<CatalogPage> = loadDocument(
+        url = "$PROGRAMS_BASE/${encode(programId)}/audios.json?page=$page",
+        forceRefresh = forceRefresh,
+        freshForMillis = PROGRAM_FRESH_MS,
+        staleForMillis = PROGRAM_STALE_MS,
+        parse = parser::parseVideoPage,
     )
 
     override suspend fun loadNextVideo(videoId: String): CatalogItem? = withContext(Dispatchers.IO) {
@@ -222,6 +272,7 @@ class DefaultCatalogRepository(
         const val CONFIG_STALE_MS = 7 * 24 * 60 * 60 * 1_000L
         const val PROGRAMS_BASE = "https://www.rtve.es/api/programas"
         const val VIDEOS_BASE = "https://api.rtve.es/api/videos"
+        const val AUDIOS_BASE = "https://api.rtve.es/api/audios"
         const val PREVIEWS_BASE = "https://videopreviews.rtve.es/tiivii-previews/api"
         const val TYPE_COMPLETE = "39816"
     }

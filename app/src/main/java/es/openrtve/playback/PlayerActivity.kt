@@ -506,8 +506,8 @@ class PlayerActivity : ComponentActivity() {
         val historyKey: String?,
         val restart: Boolean,
         val videoId: String?,
+        val isAudioOnly: Boolean,
     ) {
-        val isAudioOnly: Boolean get() = mimeType.startsWith("audio/")
 
         fun toMediaItem(uri: String, licenseUrl: String?): MediaItem = MediaItem.Builder()
             .setMediaId(uri)
@@ -535,6 +535,7 @@ class PlayerActivity : ComponentActivity() {
                 historyKey = decision.historyKey,
                 restart = restart,
                 videoId = decision.videoId,
+                isAudioOnly = decision.isAudioOnly,
             )
 
             fun from(intent: Intent): PlaybackRequest? {
@@ -549,6 +550,7 @@ class PlayerActivity : ComponentActivity() {
                     historyKey = intent.getStringExtra(EXTRA_HISTORY_KEY),
                     restart = intent.getBooleanExtra(EXTRA_RESTART, false),
                     videoId = intent.getStringExtra(EXTRA_VIDEO_ID),
+                    isAudioOnly = intent.getBooleanExtra(EXTRA_AUDIO_ONLY, mimeType.startsWith("audio/")),
                 )
             }
         }
@@ -563,6 +565,7 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_HISTORY_KEY = "playback_history_key"
         private const val EXTRA_RESTART = "playback_restart"
         private const val EXTRA_VIDEO_ID = "playback_video_id"
+        private const val EXTRA_AUDIO_ONLY = "playback_audio_only"
 
         fun intent(context: Context, decision: PlaybackDecision.Ready, restart: Boolean = false): Intent =
             Intent(context, PlayerActivity::class.java).apply {
@@ -574,6 +577,7 @@ class PlayerActivity : ComponentActivity() {
                 putExtra(EXTRA_HISTORY_KEY, decision.historyKey)
                 putExtra(EXTRA_RESTART, restart)
                 putExtra(EXTRA_VIDEO_ID, decision.videoId)
+                putExtra(EXTRA_AUDIO_ONLY, decision.isAudioOnly)
             }
     }
 }

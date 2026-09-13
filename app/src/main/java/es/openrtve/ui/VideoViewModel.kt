@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import es.openrtve.data.CatalogRepository
 import es.openrtve.domain.CatalogItem
+import es.openrtve.domain.ContentKind
 import es.openrtve.domain.VideoDetail
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +44,7 @@ class VideoViewModel(
         viewModelScope.launch {
             mutableUiState.update { it.copy(isLoading = true, error = null) }
             try {
-                val detail = repository.loadVideo(id).value
+                val detail = if (mutableUiState.value.item.kind == ContentKind.AUDIO) repository.loadAudio(id).value else repository.loadVideo(id).value
                 // La ficha trae los derechos reales, que faltan en muchos feeds de portada.
                 mutableUiState.update { it.copy(detail = detail, item = detail.item, isLoading = false) }
             } catch (error: CancellationException) {

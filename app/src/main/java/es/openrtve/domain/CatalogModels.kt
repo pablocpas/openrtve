@@ -36,6 +36,10 @@ data class HomeRow(
     val contentUrl: String?,
     val layout: RowLayout = RowLayout.LANDSCAPE,
 ) {
+    /** Módulo de emisoras de radio: llega sin `urlContent`; la fuente está en la configuración remota. */
+    val isRadioLivesModule: Boolean
+        get() = moduleType.equals("moduloDirectoRadio", ignoreCase = true) || presentation.equals("moduloDirectoRadio", ignoreCase = true)
+
     /** Fila de directos: su contenido caduca en minutos. */
     val isLive: Boolean
         get() = presentation?.lowercase()?.let { it.startsWith("directos") || it == "modulodirectoradio" } == true ||
@@ -94,6 +98,8 @@ data class LiveInfo(
     val progressPercent: Int?,
     val channelLogoUrl: String?,
     val category: String?,
+    /** Emisora de radio: el stream es HLS pero solo audio. */
+    val isAudio: Boolean = false,
 ) {
     fun progressAt(nowMillis: Long): Float? {
         val start = startsAtMillis
@@ -137,6 +143,8 @@ data class ProgramDetail(
     val emission: String?,
     val seasons: List<ProgramSeason>,
     val webUrl: String? = null,
+    /** Programa de radio: sus episodios están en `audios.json`. */
+    val isRadio: Boolean = false,
 )
 
 data class CatalogLoad<T>(

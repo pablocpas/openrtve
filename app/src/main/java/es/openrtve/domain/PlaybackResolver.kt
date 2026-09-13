@@ -27,8 +27,10 @@ sealed interface PlaybackDecision {
         val resumePositionMs: Long = 0L,
         /** ID del vídeo bajo demanda: da acceso a previews de la barra y al siguiente episodio. */
         val videoId: String? = null,
+        /** Radio en directo va por HLS, así que el MIME no basta para saber que es audio. */
+        val audioOnly: Boolean = mimeType.startsWith("audio/"),
     ) : PlaybackDecision {
-        val isAudioOnly: Boolean get() = mimeType.startsWith("audio/")
+        val isAudioOnly: Boolean get() = audioOnly
     }
 
     data class Blocked(val reason: BlockReason) : PlaybackDecision
@@ -75,6 +77,7 @@ class PlaybackResolver(
             fallbackUri = source.fallbackUri,
             historyKey = item.id.takeIf { item.kind != ContentKind.LIVE },
             videoId = item.playbackId.takeIf { item.kind == ContentKind.VIDEO || item.kind == ContentKind.PROGRAM },
+            audioOnly = item.kind == ContentKind.AUDIO || item.live?.isAudio == true,
         )
     }
 

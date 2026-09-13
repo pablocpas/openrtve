@@ -46,6 +46,7 @@ class ProgramViewModel(
 
     init {
         viewModelScope.launch {
+            // La ficha decide de dónde salen los episodios (radio -> audios.json), así que va primero.
             try {
                 val detail = repository.loadProgram(programId)
                 mutableUiState.update {
@@ -58,11 +59,16 @@ class ProgramViewModel(
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                // La lista de episodios es lo importante; la ficha es un extra.
+                // Sin ficha se intenta igualmente con los vídeos.
             }
+            loadFirstPage()
         }
-        loadFirstPage()
     }
+
+    private val isRadio: Boolean get() = mutableUiState.value.detail?.isRadio == true
+
+    private suspend fun loadPage(programId: String, seasonId: String?, page: Int, completeOnly: Boolean) =
+        if (isRadio) repository.loadProgramAudios(programId, page) else repository.loadProgramVideos(programId, seasonId, page, completeOnly)
 
     fun selectSeason(seasonId: String?) {
         if (seasonId == mutableUiState.value.selectedSeasonId) return
@@ -76,12 +82,7 @@ class ProgramViewModel(
         episodesJob = viewModelScope.launch {
             mutableUiState.update { it.copy(isLoadingMore = true) }
             try {
-                val result = repository.loadProgramVideos(
-                    programId = state.programId,
-                    seasonId = state.selectedSeasonId,
-                    page = state.page + 1,
-                    completeOnly = !state.showingClips,
-                )
+                val result = loadPage(state.programId, state.selectedSeasonId, state.page + 1, completeOnly = !state.showingClips)
                 mutableUiState.update {
                     it.copy(
                         episodes = (it.episodes + result.value.items).distinctBy(CatalogItem::id),
@@ -116,11 +117,15 @@ class ProgramViewModel(
             val seasonId = mutableUiState.value.selectedSeasonId
             try {
                 var showingClips = false
-                var result = repository.loadProgramVideos(programId, seasonId, page = 1, completeOnly = true)
-                if (result.value.items.isEmpty()) {
+                var result = loadPage(programId, seasonId, page = 1, completeOnly = true)
+                if (result.value.items.isEmpty() && !isRadio) {
                     // Programas de clips (titulares, deportes...) no tienen "Completo".
                     result = repository.loadProgramVideos(programId, seasonId, page = 1, completeOnly = false)
                     showingClips = result.value.items.isNotEmpty()
+                }
+                if (result.value.items.isEmpty() && isRadio) {
+                    // Algún programa de radio publica videopódcasts en vez de audios.
+                    result = repository.loadProgramVideos(programId, seasonId, page = 1, completeOnly = false)
                 }
                 mutableUiState.update {
                     it.copy(

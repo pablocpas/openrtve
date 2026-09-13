@@ -81,7 +81,7 @@ fun MobileApp(container: AppContainer) {
     val openItem: (CatalogItem) -> Unit = { item ->
         when (item.kind) {
             ContentKind.PROGRAM -> navigation.push(Destination.Program(item))
-            ContentKind.VIDEO -> navigation.push(Destination.Video(item))
+            ContentKind.VIDEO, ContentKind.AUDIO -> navigation.push(Destination.Video(item))
             else -> playItem(item)
         }
     }

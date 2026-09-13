@@ -16,7 +16,7 @@ class AppContainer(context: Context) {
     private val hostPolicy = RtveHostPolicy()
     /** Único cliente de red de la app: lo comparten catálogo, licencias DRM e imágenes. */
     val okHttpClient: OkHttpClient = SafeHttpsClient.buildOkHttpClient(hostPolicy)
-    private val httpClient = SafeHttpsClient(okHttpClient)
+    private val httpClient = SafeHttpsClient(okHttpClient, hostPolicy)
     val documentCache = RawDocumentCache(context.cacheDir.resolve("catalog"))
     val catalogRepository = DefaultCatalogRepository(
         httpClient = httpClient,

@@ -386,7 +386,8 @@ internal fun EpisodeRow(
             .then(if (highlighted) Modifier.background(MaterialTheme.colorScheme.surface) else Modifier)
             .padding(horizontal = ScreenPadding, vertical = 6.dp),
     ) {
-        Artwork(item.imageUrl, 16f / 9f, Modifier.width(140.dp)) {
+        val square = item.kind == ContentKind.AUDIO
+        Artwork(if (square) item.squareUrl ?: item.imageUrl else item.imageUrl, if (square) 1f else 16f / 9f, Modifier.width(if (square) 88.dp else 140.dp)) {
             progress?.let { ProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
         }
         Column(modifier = Modifier.weight(1f)) {

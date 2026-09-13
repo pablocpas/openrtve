@@ -1,6 +1,8 @@
 package es.openrtve.data
 
 import es.openrtve.domain.ContentKind
+import es.openrtve.domain.PlaybackDecision
+import es.openrtve.domain.PlaybackResolver
 import es.openrtve.domain.RowLayout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -173,6 +175,33 @@ class RtveJsonParserTest {
         assertEquals("https://img.rtve.es/imagenes/x.jpg", detail.imageUrl)
         assertEquals(listOf("1000013"), detail.seasons.map { it.id })
         assertEquals(8, detail.seasons.single().episodeCount)
+    }
+
+    @Test
+    fun `radio lives url comes from the remote config`() {
+        assertEquals(
+            "https://www.rtve.es/m/configs/rtve_play/testDirectos.json",
+            parser.parseRadioLivesUrl("""{"radio":{"secciones":{"directosRadio":{"urlContent":"https://www.rtve.es/m/configs/rtve_play/testDirectos.json"}}}}"""),
+        )
+        val row = parser.parseHome("""{"rows":[{"orden":1,"title":"En directo","moduleType":"moduloDirectoRadio"}]}""").rows.single()
+        assertTrue(row.isRadioLivesModule)
+        assertNull(row.contentUrl)
+    }
+
+    @Test
+    fun `radio programs and stations are recognised`() {
+        val program = parser.parseProgram(
+            """{"page":{"items":[{"id":"11271","name":"Ficción sonora","mainTopic":"Radio/Programas de RNE/Cultura/Ficción sonora","htmlUrl":"https://www.rtve.es/play/audios/ficcion-sonora/"}]}}""",
+        )
+        assertTrue(program.isRadio)
+        assertFalse(parser.parseProgram("""{"page":{"items":[{"id":"1","name":"TD","mainTopic":"Televisión/Informativos"}]}}""").isRadio)
+
+        val station = parser.parseModule(
+            """{"page":{"items":[{"id":"1852","titulo":"Radio Nacional","tipo":"broadcast","contentType":"directo","idAsset":"1712486","live":true,"audio":true}]}}""",
+            fallbackTitle = "",
+        ).items.single()
+        assertTrue(station.live!!.isAudio)
+        assertTrue((PlaybackResolver().resolve(station) as PlaybackDecision.Ready).isAudioOnly)
     }
 
     @Test

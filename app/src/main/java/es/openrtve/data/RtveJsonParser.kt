@@ -178,6 +178,8 @@ class RtveJsonParser(
             emission = program.text("emission"),
             seasons = seasons,
             webUrl = program.text("htmlUrl")?.let(hostPolicy::sanitize),
+            isRadio = program.text("mainTopic")?.startsWith("Radio", ignoreCase = true) == true ||
+                program.text("htmlUrl")?.contains("/audios/") == true,
         )
     }
 
@@ -286,6 +288,7 @@ class RtveJsonParser(
         progressPercent = item.number("porcentaje"),
         channelLogoUrl = item.text("logo")?.let(hostPolicy::sanitize),
         category = item.text("antetitulo")?.let(::titleCase),
+        isAudio = item.flag("audio") == true,
     )
 
     /** El feed escribe las horas en local de Madrid, sin zona. */
@@ -299,6 +302,11 @@ class RtveJsonParser(
     private fun titleCase(value: String): String =
         if (value != value.uppercase()) value
         else value.lowercase().split(' ').joinToString(" ") { word -> word.replaceFirstChar { it.uppercase() } }
+
+    /** Fuente de las emisoras de radio en directo, en `radio.secciones.directosRadio.urlContent` de la configuración. */
+    fun parseRadioLivesUrl(raw: String): String? = json.parseToJsonElement(raw).jsonObject
+        .obj("radio")?.obj("secciones")?.obj("directosRadio")?.text("urlContent")
+        ?.let(hostPolicy::sanitize)
 
     /** Respuesta de `tiivii-previews/api/sprite`: URLs del sprite y de su VTT, o `null` si no está disponible. */
     fun parseSpriteInfo(raw: String): Pair<String, String>? {
@@ -434,10 +442,12 @@ class RtveJsonParser(
 
     private fun squareImage(kind: ContentKind, id: String, media: JsonObject, item: JsonObject): String? = when (kind) {
         ContentKind.PROGRAM -> derivedImage("p", id, "imgBackground", SQUARE_WIDTH)
+        // Muchos audios no tienen imagen propia: la del programa (cuadrada) es mejor reserva que un 404.
         ContentKind.AUDIO -> firstAllowed(
             media.obj("previews")?.text("square", "square2"),
             item.text("imgBackground", "imagePodcast"),
-        ) ?: derivedImage("a", id, null, SQUARE_WIDTH)
+        ) ?: item.obj("programInfo")?.text("id")?.let { derivedImage("p", it, "imgBackground", SQUARE_WIDTH) }
+            ?: derivedImage("a", id, null, SQUARE_WIDTH)
         ContentKind.VIDEO -> null
         else -> firstAllowed(item.text("thumb_square", "imgBackground"), media.obj("previews")?.text("square", "square2"))
     }
