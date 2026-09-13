@@ -88,6 +88,14 @@ los enlaza `PlayerControlView`, que abre sus propios selectores; los nuestros
 actividad. `PlayerGestures` añade toque, doble toque y deslizamientos. Findroid
 es GPLv3: se toma el diseño, no el código.
 
+Como en RTVE Play, un solo engranaje abre el panel de ajustes (`PlayerSettingsPanel`):
+calidad (alturas reales de las pistas del stream; series y cine traen
+1080/720/576/360), velocidad, audio (`qaa` = versión original, `ads` =
+audiodescripción) y subtítulos, todo aplicado con `TrackSelectionParameters`.
+Las miniaturas al arrastrar salen del sprite + VTT de `videopreviews.rtve.es`,
+y el siguiente episodio de `videos/{id}/next.json`, con aviso en los últimos
+20 s y encadenado automático si el ajuste está activo.
+
 Ciclo de vida, según la guía de Android para reproductores de vídeo: al salir
 de la pantalla (`onStop`) el vídeo se pausa salvo en PiP, y al cerrarla (atrás
 o cerrar la ventana PiP) se detiene y vacía la sesión. Radio y pódcasts siguen

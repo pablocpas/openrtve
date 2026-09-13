@@ -38,22 +38,10 @@
             android:textSize="16sp" />
 
         <ImageButton
-            android:id="@id/exo_audio_track"
+            android:id="@+id/player_settings"
             style="@style/PlayerIconButton"
-            android:contentDescription="@string/player_audio_track"
-            android:src="@drawable/ic_player_audio" />
-
-        <ImageButton
-            android:id="@id/exo_subtitle"
-            style="@style/PlayerIconButton"
-            android:contentDescription="@string/player_subtitles"
-            android:src="@drawable/ic_player_subtitles" />
-
-        <ImageButton
-            android:id="@id/exo_playback_speed"
-            style="@style/PlayerIconButton"
-            android:contentDescription="@string/player_speed"
-            android:src="@drawable/ic_player_speed" />
+            android:contentDescription="@string/player_settings"
+            android:src="@drawable/ic_player_settings" />
 
         <ImageButton
             android:id="@+id/player_aspect"
@@ -152,6 +140,14 @@
             <TextView
                 android:id="@id/exo_duration"
                 style="@style/PlayerTimeText" />
+
+            <ImageButton
+                android:id="@+id/player_next"
+                style="@style/PlayerIconButton"
+                android:layout_marginStart="8dp"
+                android:contentDescription="@string/player_next_button"
+                android:src="@drawable/ic_player_next"
+                android:visibility="gone" />
         </LinearLayout>
 
         <androidx.media3.ui.DefaultTimeBar

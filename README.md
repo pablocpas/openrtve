@@ -23,13 +23,14 @@ de la Corporación de Radio y Televisión Española.
   bloque; **categorías** leídas de la configuración remota de RTVE.
 - **Directos** con logo del canal, "● Directo" y progreso de la emisión;
   los programados muestran su horario. **Seguir viendo** local, sin cuenta.
-- **Reproductor** Media3 con controles propios (pista de audio, subtítulos,
-  velocidad, ajuste de imagen, imagen en imagen, bloqueo), gestos (doble toque
-  para saltar, deslizar para brillo y volumen), indicador de directo con
-  ventana DVR, MediaSession y audio en segundo plano para radio y pódcasts.
+- **Reproductor** Media3 con panel de ajustes (calidad, velocidad, audio,
+  subtítulos), miniaturas al arrastrar, siguiente episodio con reproducción
+  automática, ajuste de imagen, imagen en imagen, bloqueo, gestos (doble
+  toque para saltar, deslizar para brillo y volumen), indicador de directo
+  con ventana DVR, MediaSession y audio en segundo plano para radio y pódcasts.
 - **DASH, HLS y MP3**, con Widevine para el contenido protegido.
-- **Ajustes**: imagen en imagen, audio en segundo plano, ahorro de datos,
-  subtítulos por defecto y borrado de caché.
+- **Ajustes**: imagen en imagen, audio en segundo plano, calidad máxima,
+  reproducción automática, subtítulos por defecto y borrado de caché.
 - Caché con revalidación por ETag, una sola conexión HTTP/2 para catálogo e
   imágenes y allowlist estricta de hosts.
 

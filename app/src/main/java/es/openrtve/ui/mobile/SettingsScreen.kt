@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -60,10 +64,28 @@ fun SettingsScreen(
                 checked = settings.backgroundAudio,
             ) { value -> viewModel.update { it.copy(backgroundAudio = value) } }
             SwitchRow(
-                title = stringResource(R.string.settings_data_saver),
-                summary = stringResource(R.string.settings_data_saver_summary),
-                checked = settings.dataSaver,
-            ) { value -> viewModel.update { it.copy(dataSaver = value) } }
+                title = stringResource(R.string.settings_autoplay),
+                summary = stringResource(R.string.settings_autoplay_summary),
+                checked = settings.autoplayNext,
+            ) { value -> viewModel.update { it.copy(autoplayNext = value) } }
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_max_quality)) },
+                supportingContent = { Text(stringResource(R.string.settings_max_quality_summary)) },
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = ScreenPadding, vertical = 4.dp),
+            ) {
+                QUALITY_CHOICES.forEach { height ->
+                    FilterChip(
+                        selected = settings.maxVideoHeight == height,
+                        onClick = { viewModel.update { it.copy(maxVideoHeight = height) } },
+                        label = { Text(if (height == 0) stringResource(R.string.player_quality_auto) else "${height}p") },
+                    )
+                }
+            }
             SwitchRow(
                 title = stringResource(R.string.settings_subtitles),
                 summary = stringResource(R.string.settings_subtitles_summary),
@@ -114,3 +136,5 @@ private fun SwitchRow(title: String, summary: String, checked: Boolean, onChange
     )
 }
 
+
+private val QUALITY_CHOICES = listOf(0, 1080, 720, 576, 360)

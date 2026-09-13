@@ -48,7 +48,12 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import androidx.media3.common.Tracks
 import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.DefaultTimeBar
+import androidx.media3.ui.TimeBar
+import es.openrtve.domain.CatalogItem
+import es.openrtve.domain.PreviewSprite
 import androidx.media3.ui.PlayerView
 import android.content.res.Configuration
 import android.view.LayoutInflater
@@ -85,6 +90,14 @@ class PlayerActivity : ComponentActivity() {
     private var feedback by mutableStateOf<GestureFeedback?>(null)
     private var title by mutableStateOf("")
     private var liveState by mutableStateOf<LiveState?>(null)
+    private var menu by mutableStateOf<PlayerMenu?>(null)
+    private var sprite by mutableStateOf<PreviewSprite?>(null)
+    /** Posición y fracción de la barra mientras el usuario arrastra. */
+    private var scrub by mutableStateOf<Pair<Long, Float>?>(null)
+    private var nextItem by mutableStateOf<CatalogItem?>(null)
+    private var nextCountdown by mutableStateOf<Int?>(null)
+    private var showNext by mutableStateOf(false)
+    private var extrasJob: Job? = null
     private var request: PlaybackRequest? = null
     internal var playerView: PlayerView? = null
     private var liveTicker: Job? = null
@@ -108,6 +121,14 @@ class PlayerActivity : ComponentActivity() {
         override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) = refreshLiveState()
 
         override fun onIsPlayingChanged(isPlaying: Boolean) = refreshLiveState()
+
+        override fun onTracksChanged(tracks: Tracks) {
+            if (menu != null) controller?.let { menu = buildPlayerMenu(this@PlayerActivity, it) }
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_ENDED && nextItem != null && settings.current.autoplayNext) playNext()
+        }
 
         override fun onPlayerError(error: PlaybackException) {
             val player = controller ?: return
@@ -148,6 +169,21 @@ class PlayerActivity : ComponentActivity() {
                     title = title,
                     liveState = liveState,
                     onGoLive = { controller?.seekToDefaultPosition() },
+                    menu = menu,
+                    onOpenMenu = { controller?.let { menu = buildPlayerMenu(this, it) } },
+                    onSelectOption = { option ->
+                        controller?.let { c ->
+                            option.apply(c)
+                            menu = buildPlayerMenu(this, c)
+                        }
+                    },
+                    onCloseMenu = { menu = null },
+                    sprite = sprite,
+                    scrub = scrub,
+                    onScrub = { scrub = it },
+                    nextTitle = nextItem?.takeIf { showNext }?.title,
+                    nextCountdown = nextCountdown,
+                    onPlayNext = ::playNext,
                     controlsEnabled = !inPictureInPicture && !locked,
                     locked = locked,
                     showUnlock = showUnlock && !inPictureInPicture,
@@ -172,10 +208,13 @@ class PlayerActivity : ComponentActivity() {
      * vez visibles, el foco pasa a sus botones.
      */
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (menu != null) return super.onKeyDown(keyCode, event)
         val view = playerView
         if (view != null && !locked && view.useController && view.dispatchKeyEvent(event)) return true
         return super.onKeyDown(keyCode, event)
     }
+
+
 
     private fun enterPictureInPictureNow() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && canEnterPictureInPicture()) {
@@ -241,6 +280,7 @@ class PlayerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        extrasJob?.cancel()
         liveTicker?.cancel()
         startJob?.cancel()
         controller?.removeListener(playerListener)
@@ -268,6 +308,7 @@ class PlayerActivity : ComponentActivity() {
                             while (true) {
                                 delay(LIVE_TICK_MS)
                                 refreshLiveState()
+                                refreshNextState()
                                 if (++ticks % PROGRESS_SAVE_EVERY_TICKS == 0 && controller?.isPlaying == true) saveProgress()
                             }
                         }
@@ -295,6 +336,7 @@ class PlayerActivity : ComponentActivity() {
             if (player.playbackState == Player.STATE_IDLE) player.prepare()
             return
         }
+        loadExtras(request.videoId)
         startJob?.cancel()
         startJob = lifecycleScope.launch {
             if (request.drmTokenUrl != null && !isWidevineAvailable() && request.fallbackUri != null) {
@@ -325,7 +367,7 @@ class PlayerActivity : ComponentActivity() {
         val prefs = settings.current
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .apply {
-                if (prefs.dataSaver) setMaxVideoSize(DATA_SAVER_MAX_WIDTH, DATA_SAVER_MAX_HEIGHT) else clearVideoSizeConstraints()
+                if (prefs.maxVideoHeight > 0) setMaxVideoSize(Int.MAX_VALUE, prefs.maxVideoHeight) else clearVideoSizeConstraints()
                 setPreferredTextLanguages(*if (prefs.subtitlesByDefault) arrayOf("es", "spa") else emptyArray())
             }
             .build()
@@ -342,6 +384,46 @@ class PlayerActivity : ComponentActivity() {
     }
 
     private val history get() = (application as OpenRtveApplication).container.watchHistory
+    private val container get() = (application as OpenRtveApplication).container
+
+    /** Previews de la barra y siguiente episodio: extras que no bloquean la reproducción. */
+    private fun loadExtras(videoId: String?) {
+        extrasJob?.cancel()
+        sprite = null
+        nextItem = null
+        showNext = false
+        nextCountdown = null
+        if (videoId == null) return
+        extrasJob = lifecycleScope.launch {
+            launch { sprite = runCatching { container.catalogRepository.loadPreviewSprite(videoId) }.getOrNull() }
+            launch { nextItem = runCatching { container.catalogRepository.loadNextVideo(videoId) }.getOrNull() }
+        }
+    }
+
+    private fun refreshNextState() {
+        val player = controller ?: return
+        val next = nextItem
+        if (next == null || player.isCurrentMediaItemLive || player.duration == C.TIME_UNSET) {
+            showNext = false
+            return
+        }
+        val remaining = player.duration - player.currentPosition
+        showNext = remaining in 0..NEXT_PROMPT_BEFORE_END_MS
+        nextCountdown = if (showNext && settings.current.autoplayNext) (remaining / 1_000L).toInt().coerceAtLeast(0) else null
+    }
+
+    private fun playNext() {
+        val next = nextItem ?: return
+        val player = controller ?: return
+        val decision = container.playbackResolver.resolve(next) as? PlaybackDecision.Ready ?: return
+        history.register(next)
+        request = PlaybackRequest.from(decision, restart = false)
+        usedFallback = false
+        errorRes = null
+        showNext = false
+        applyPresentation()
+        startRequested(player)
+    }
 
     /** Guarda la posición para "Seguir viendo"; el ticker lo llama cada segundo y onStop al salir. */
     private fun saveProgress() {
@@ -416,6 +498,7 @@ class PlayerActivity : ComponentActivity() {
         val fallbackUri: String?,
         val historyKey: String?,
         val restart: Boolean,
+        val videoId: String?,
     ) {
         val isAudioOnly: Boolean get() = mimeType.startsWith("audio/")
 
@@ -436,6 +519,17 @@ class PlayerActivity : ComponentActivity() {
             .build()
 
         companion object {
+            fun from(decision: PlaybackDecision.Ready, restart: Boolean) = PlaybackRequest(
+                uri = decision.uri,
+                mimeType = decision.mimeType,
+                title = decision.title,
+                drmTokenUrl = decision.drm?.tokenUrl,
+                fallbackUri = decision.fallbackUri,
+                historyKey = decision.historyKey,
+                restart = restart,
+                videoId = decision.videoId,
+            )
+
             fun from(intent: Intent): PlaybackRequest? {
                 val uri = intent.getStringExtra(EXTRA_URI)?.takeIf(String::isNotBlank) ?: return null
                 val mimeType = intent.getStringExtra(EXTRA_MIME_TYPE)?.takeIf(String::isNotBlank) ?: return null
@@ -447,6 +541,7 @@ class PlayerActivity : ComponentActivity() {
                     fallbackUri = intent.getStringExtra(EXTRA_FALLBACK_URI),
                     historyKey = intent.getStringExtra(EXTRA_HISTORY_KEY),
                     restart = intent.getBooleanExtra(EXTRA_RESTART, false),
+                    videoId = intent.getStringExtra(EXTRA_VIDEO_ID),
                 )
             }
         }
@@ -460,6 +555,7 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_FALLBACK_URI = "playback_fallback_uri"
         private const val EXTRA_HISTORY_KEY = "playback_history_key"
         private const val EXTRA_RESTART = "playback_restart"
+        private const val EXTRA_VIDEO_ID = "playback_video_id"
 
         fun intent(context: Context, decision: PlaybackDecision.Ready, restart: Boolean = false): Intent =
             Intent(context, PlayerActivity::class.java).apply {
@@ -470,6 +566,7 @@ class PlayerActivity : ComponentActivity() {
                 putExtra(EXTRA_FALLBACK_URI, decision.fallbackUri)
                 putExtra(EXTRA_HISTORY_KEY, decision.historyKey)
                 putExtra(EXTRA_RESTART, restart)
+                putExtra(EXTRA_VIDEO_ID, decision.videoId)
             }
     }
 }
@@ -482,6 +579,16 @@ private fun PlaybackScreen(
     title: String,
     liveState: PlayerActivity.LiveState?,
     onGoLive: () -> Unit,
+    menu: PlayerMenu?,
+    onOpenMenu: () -> Unit,
+    onSelectOption: (PlayerOption) -> Unit,
+    onCloseMenu: () -> Unit,
+    sprite: PreviewSprite?,
+    scrub: Pair<Long, Float>?,
+    onScrub: (Pair<Long, Float>?) -> Unit,
+    nextTitle: String?,
+    nextCountdown: Int?,
+    onPlayNext: () -> Unit,
     controlsEnabled: Boolean,
     locked: Boolean,
     showUnlock: Boolean,
@@ -521,6 +628,22 @@ private fun PlaybackScreen(
                         visibility = if (canPictureInPicture) View.VISIBLE else View.GONE
                         setOnClickListener { onPictureInPicture() }
                     }
+                    view.findViewById<ImageButton>(R.id.player_settings).setOnClickListener {
+                        view.hideController()
+                        onOpenMenu()
+                    }
+                    view.findViewById<ImageButton>(R.id.player_next).setOnClickListener { onPlayNext() }
+                    view.findViewById<DefaultTimeBar>(androidx.media3.ui.R.id.exo_progress).addListener(
+                        object : TimeBar.OnScrubListener {
+                            override fun onScrubStart(timeBar: TimeBar, position: Long) = report(position)
+                            override fun onScrubMove(timeBar: TimeBar, position: Long) = report(position)
+                            override fun onScrubStop(timeBar: TimeBar, position: Long, canceled: Boolean) = onScrub(null)
+                            private fun report(position: Long) {
+                                val duration = view.player?.duration ?: return
+                                if (duration > 0) onScrub(position to (position.toFloat() / duration))
+                            }
+                        },
+                    )
                     view.findViewById<ImageButton>(R.id.player_aspect).setOnClickListener {
                         view.resizeMode = if (view.resizeMode == AspectRatioFrameLayout.RESIZE_MODE_FIT) {
                             AspectRatioFrameLayout.RESIZE_MODE_ZOOM
@@ -543,8 +666,9 @@ private fun PlaybackScreen(
                 update = { view ->
                     view.player = controller
                     view.findViewById<TextView>(R.id.player_title).text = title
-                    view.useController = controlsEnabled
-                    if (!controlsEnabled) view.hideController()
+                    view.useController = controlsEnabled && menu == null
+                    if (!controlsEnabled || menu != null) view.hideController()
+                    view.findViewById<ImageButton>(R.id.player_next).visibility = if (nextTitle != null) View.VISIBLE else View.GONE
                     // Directo: sin tiempos absolutos (la ventana DVR no es una duración) y con indicador en vivo.
                     val live = view.findViewById<TextView>(R.id.player_live)
                     val isLive = liveState != null
@@ -563,6 +687,16 @@ private fun PlaybackScreen(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+        }
+        if (sprite != null && scrub != null) {
+            ScrubPreview(sprite, scrub.first, scrub.second)
+        }
+        if (nextTitle != null && menu == null) {
+            NextEpisodeCard(nextTitle, nextCountdown, onPlayNext)
+        }
+        menu?.let {
+            androidx.activity.compose.BackHandler(onBack = onCloseMenu)
+            PlayerSettingsPanel(it, onSelectOption, onCloseMenu)
         }
         feedback?.let {
             Text(
@@ -603,5 +737,4 @@ private const val UNLOCK_VISIBLE_MS = 3_000L
 private const val LIVE_TICK_MS = 1_000L
 private const val PROGRESS_SAVE_EVERY_TICKS = 10
 private const val LIVE_EDGE_TOLERANCE_MS = 20_000L
-private const val DATA_SAVER_MAX_WIDTH = 1024
-private const val DATA_SAVER_MAX_HEIGHT = 576
+private const val NEXT_PROMPT_BEFORE_END_MS = 20_000L

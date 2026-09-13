@@ -25,6 +25,8 @@ sealed interface PlaybackDecision {
         /** Clave del item en "Seguir viendo"; `null` si no se guarda progreso (directos). */
         val historyKey: String? = null,
         val resumePositionMs: Long = 0L,
+        /** ID del vídeo bajo demanda: da acceso a previews de la barra y al siguiente episodio. */
+        val videoId: String? = null,
     ) : PlaybackDecision {
         val isAudioOnly: Boolean get() = mimeType.startsWith("audio/")
     }
@@ -72,6 +74,7 @@ class PlaybackResolver(
             drm = source.drm,
             fallbackUri = source.fallbackUri,
             historyKey = item.id.takeIf { item.kind != ContentKind.LIVE },
+            videoId = item.playbackId.takeIf { item.kind == ContentKind.VIDEO || item.kind == ContentKind.PROGRAM },
         )
     }
 

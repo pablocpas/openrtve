@@ -11,10 +11,12 @@ data class Settings(
     val pictureInPictureOnLeave: Boolean = true,
     /** Radio y pódcasts siguen sonando al salir del reproductor, con su notificación. */
     val backgroundAudio: Boolean = true,
-    /** Limitar el vídeo a 576p, como el modo de ahorro de la app oficial. */
-    val dataSaver: Boolean = false,
+    /** Altura máxima de vídeo (0 = automática). 576 equivale al ahorro de datos de la app oficial. */
+    val maxVideoHeight: Int = 0,
     /** Activar subtítulos en español cuando existan. */
     val subtitlesByDefault: Boolean = false,
+    /** Encadenar el siguiente episodio al terminar. */
+    val autoplayNext: Boolean = true,
 )
 
 /**
@@ -33,8 +35,9 @@ class AppSettings(context: Context) {
         prefs.edit()
             .putBoolean(KEY_PIP, updated.pictureInPictureOnLeave)
             .putBoolean(KEY_BACKGROUND_AUDIO, updated.backgroundAudio)
-            .putBoolean(KEY_DATA_SAVER, updated.dataSaver)
+            .putInt(KEY_MAX_HEIGHT, updated.maxVideoHeight)
             .putBoolean(KEY_SUBTITLES, updated.subtitlesByDefault)
+            .putBoolean(KEY_AUTOPLAY, updated.autoplayNext)
             .apply()
         mutableSettings.update { updated }
     }
@@ -42,15 +45,17 @@ class AppSettings(context: Context) {
     private fun read() = Settings(
         pictureInPictureOnLeave = prefs.getBoolean(KEY_PIP, true),
         backgroundAudio = prefs.getBoolean(KEY_BACKGROUND_AUDIO, true),
-        dataSaver = prefs.getBoolean(KEY_DATA_SAVER, false),
+        maxVideoHeight = prefs.getInt(KEY_MAX_HEIGHT, 0),
         subtitlesByDefault = prefs.getBoolean(KEY_SUBTITLES, false),
+        autoplayNext = prefs.getBoolean(KEY_AUTOPLAY, true),
     )
 
     private companion object {
         const val PREFS_NAME = "openrtve_settings"
         const val KEY_PIP = "pip_on_leave"
         const val KEY_BACKGROUND_AUDIO = "background_audio"
-        const val KEY_DATA_SAVER = "data_saver"
+        const val KEY_MAX_HEIGHT = "max_video_height"
+        const val KEY_AUTOPLAY = "autoplay_next"
         const val KEY_SUBTITLES = "subtitles_by_default"
     }
 }

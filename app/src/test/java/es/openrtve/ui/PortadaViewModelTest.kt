@@ -9,6 +9,7 @@ import es.openrtve.domain.ContentKind
 import es.openrtve.domain.ExploreGroup
 import es.openrtve.domain.HomeFeed
 import es.openrtve.domain.HomeRow
+import es.openrtve.domain.PreviewSprite
 import es.openrtve.domain.ProgramDetail
 import es.openrtve.domain.QuickFilter
 import es.openrtve.domain.SearchResults
@@ -143,6 +144,8 @@ class PortadaViewModelTest {
         override suspend fun search(query: String): SearchResults = throw UnsupportedOperationException()
         override suspend fun loadProgram(programId: String, forceRefresh: Boolean): CatalogLoad<ProgramDetail> = throw UnsupportedOperationException()
         override suspend fun loadVideo(videoId: String, forceRefresh: Boolean): CatalogLoad<VideoDetail> = throw UnsupportedOperationException()
+        override suspend fun loadNextVideo(videoId: String): CatalogItem? = null
+        override suspend fun loadPreviewSprite(videoId: String): PreviewSprite? = null
         override suspend fun loadProgramVideos(programId: String, seasonId: String?, page: Int, completeOnly: Boolean, forceRefresh: Boolean): CatalogLoad<CatalogPage> = throw UnsupportedOperationException()
     }
 

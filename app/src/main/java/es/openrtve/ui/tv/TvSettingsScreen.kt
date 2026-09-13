@@ -63,8 +63,17 @@ fun TvSettingsScreen(container: AppContainer, onMessage: (String) -> Unit) {
         TvSwitchRow(stringResource(R.string.settings_background_audio), stringResource(R.string.settings_background_audio_summary), settings.backgroundAudio) { v ->
             viewModel.update { it.copy(backgroundAudio = v) }
         }
-        TvSwitchRow(stringResource(R.string.settings_data_saver), stringResource(R.string.settings_data_saver_summary), settings.dataSaver) { v ->
-            viewModel.update { it.copy(dataSaver = v) }
+        TvSwitchRow(stringResource(R.string.settings_autoplay), stringResource(R.string.settings_autoplay_summary), settings.autoplayNext) { v ->
+            viewModel.update { it.copy(autoplayNext = v) }
+        }
+        Text(stringResource(R.string.settings_max_quality), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.settings_max_quality_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            listOf(0, 1080, 720, 576, 360).forEach { height ->
+                TvChoiceButton(if (height == 0) stringResource(R.string.player_quality_auto) else "${height}p", settings.maxVideoHeight == height) {
+                    viewModel.update { it.copy(maxVideoHeight = height) }
+                }
+            }
         }
         TvSwitchRow(stringResource(R.string.settings_subtitles), stringResource(R.string.settings_subtitles_summary), settings.subtitlesByDefault) { v ->
             viewModel.update { it.copy(subtitlesByDefault = v) }

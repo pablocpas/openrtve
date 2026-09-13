@@ -1,11 +1,13 @@
 package es.openrtve.data
 
+import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.CatalogLoad
 import es.openrtve.domain.CatalogModule
 import es.openrtve.domain.CatalogPage
 import es.openrtve.domain.ExploreGroup
 import es.openrtve.domain.HomeFeed
 import es.openrtve.domain.HomeRow
+import es.openrtve.domain.PreviewSprite
 import es.openrtve.domain.ProgramDetail
 import es.openrtve.domain.QuickFilter
 import es.openrtve.domain.RtveUrls
@@ -25,6 +27,12 @@ interface CatalogRepository {
     suspend fun search(query: String): SearchResults
     suspend fun loadProgram(programId: String, forceRefresh: Boolean = false): CatalogLoad<ProgramDetail>
     suspend fun loadVideo(videoId: String, forceRefresh: Boolean = false): CatalogLoad<VideoDetail>
+
+    /** Siguiente episodio según RTVE (`videos/{id}/next.json`), o `null` si no hay. */
+    suspend fun loadNextVideo(videoId: String): CatalogItem?
+
+    /** Miniaturas para la barra de progreso, o `null` si el vídeo no las tiene. */
+    suspend fun loadPreviewSprite(videoId: String): PreviewSprite?
 
     /**
      * Episodios de un programa o de una temporada. `completeOnly` pide solo
@@ -122,6 +130,16 @@ class DefaultCatalogRepository(
         parse = parser::parseVideo,
     )
 
+    override suspend fun loadNextVideo(videoId: String): CatalogItem? = withContext(Dispatchers.IO) {
+        parser.parseVideoPage(httpClient.get("$VIDEOS_BASE/${encode(videoId)}/next.json")).items.firstOrNull()
+    }
+
+    override suspend fun loadPreviewSprite(videoId: String): PreviewSprite? = withContext(Dispatchers.IO) {
+        val (spriteUrl, vttUrl) = parser.parseSpriteInfo(httpClient.get("$PREVIEWS_BASE/sprite?idasset=${encode(videoId)}"))
+            ?: return@withContext null
+        parser.parseSpriteVtt(httpClient.get(vttUrl), spriteUrl)
+    }
+
     override suspend fun loadProgramVideos(
         programId: String,
         seasonId: String?,
@@ -192,6 +210,7 @@ class DefaultCatalogRepository(
         const val CONFIG_STALE_MS = 7 * 24 * 60 * 60 * 1_000L
         const val PROGRAMS_BASE = "https://www.rtve.es/api/programas"
         const val VIDEOS_BASE = "https://api.rtve.es/api/videos"
+        const val PREVIEWS_BASE = "https://videopreviews.rtve.es/tiivii-previews/api"
         const val TYPE_COMPLETE = "39816"
     }
 }
