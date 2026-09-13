@@ -13,6 +13,7 @@ import es.openrtve.domain.VideoDetail
 import es.openrtve.domain.ContentKind
 import es.openrtve.domain.HomeFeed
 import es.openrtve.domain.HomeRow
+import es.openrtve.domain.LiveInfo
 import es.openrtve.domain.ProgramDetail
 import es.openrtve.domain.ProgramSeason
 import es.openrtve.domain.RtveHostPolicy
@@ -25,6 +26,9 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 class RtveJsonParser(
     private val json: Json = Json { ignoreUnknownKeys = true },
@@ -231,9 +235,11 @@ class RtveJsonParser(
         val editorialType = media.text("tipo") ?: item.text("tipo")
         val assetId = media.text("idAsset") ?: item.text("idAsset")
         val kind = contentKind(contentType, editorialType, nestedMedia != null, assetId)
+        val live = if (kind == ContentKind.LIVE) liveInfo(item) else null
         val subtitle = when {
             mediaTitle != null -> mediaTitle
             kind == ContentKind.VIDEO -> item.obj("programInfo")?.text("title")
+            kind == ContentKind.LIVE -> live?.category
             else -> null
         }
 
@@ -266,8 +272,30 @@ class RtveJsonParser(
             publicationDate = media.text("publicationDate", "dateOfEmission"),
             episode = media.number("episode")?.takeIf { it > 0 },
             seasonTitle = media.text("temporada", "temporadaShortTitle"),
+            live = live,
         )
     }
+
+    private fun liveInfo(item: JsonObject): LiveInfo = LiveInfo(
+        isOnAir = item.flag("live") ?: true,
+        startsAtMillis = item.text("inicio")?.let(::parseMadridTime),
+        durationMinutes = item.number("duracion")?.takeIf { it > 0 },
+        progressPercent = item.number("porcentaje"),
+        channelLogoUrl = item.text("logo")?.let(hostPolicy::sanitize),
+        category = item.text("antetitulo")?.let(::titleCase),
+    )
+
+    /** El feed escribe las horas en local de Madrid, sin zona. */
+    private fun parseMadridTime(value: String): Long? = runCatching {
+        SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.ROOT)
+            .apply { timeZone = TimeZone.getTimeZone("Europe/Madrid") }
+            .parse(value)?.time
+    }.getOrNull()
+
+    /** "LA VUELTA 2026" -> "La Vuelta 2026"; los antetítulos llegan en mayúsculas. */
+    private fun titleCase(value: String): String =
+        if (value != value.uppercase()) value
+        else value.lowercase().split(' ').joinToString(" ") { word -> word.replaceFirstChar { it.uppercase() } }
 
     private fun isContainer(program: JsonObject, media: JsonObject): Boolean =
         program.text("programType")?.contains("contenedor", ignoreCase = true) == true ||

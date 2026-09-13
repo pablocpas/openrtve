@@ -59,6 +59,24 @@ Datos, estado y política son comunes. Las superficies no lo son:
 No se decide la UI por orientación o por un ancho fijo. La actividad elegida
 por el launcher determina móvil/TV y cada shell responde al espacio disponible.
 
+## Directos, "Seguir viendo" y refresco
+
+El feed de directos trae programa en emisión (`titulo`), categoría
+(`antetitulo`), `live`, `inicio`, `duracion`, `porcentaje` y `logo` del canal;
+el parser lo convierte en `LiveInfo` y la UI calcula el progreso con el reloj
+(un `LocalNowMillis` compartido que avanza cada 30 s), así la barra se mueve sin
+red. Un directo programado (`live=false` con `inicio` futuro) se muestra con su
+horario y el resolver lo bloquea hasta la hora.
+
+"Seguir viendo" es local (`WatchHistory`, un JSON en `filesDir`): el
+reproductor guarda la posición cada 10 s y al salir; por debajo de 30 s no
+cuenta y al 95 % se da por terminado. La portada raíz lo pinta tras el hero.
+
+Refresco como la app oficial (`refresh: 120` en su configuración): la portada se
+recarga al volver a primer plano si tiene más de dos minutos y, mientras está
+visible, las filas de directos se recargan cada minuto (con ETag, un 304 si no
+hay cambios).
+
 ## Reproductor
 
 `PlayerView` de Media3 con un layout de controles propio

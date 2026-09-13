@@ -53,6 +53,18 @@ class PlaybackResolverTest {
     }
 
     @Test
+    fun `a scheduled live that has not started is blocked until its start time`() {
+        val live = item(kind = ContentKind.LIVE).copy(
+            assetId = "a",
+            live = LiveInfo(isOnAir = false, startsAtMillis = 2_000L, durationMinutes = 60, progressPercent = 0, channelLogoUrl = null, category = null),
+        )
+
+        assertEquals(PlaybackDecision.Blocked(BlockReason.NOT_STARTED_YET), PlaybackResolver(nowMillis = { 1_000L }).resolve(live))
+        assertTrue(PlaybackResolver(nowMillis = { 3_000L }).resolve(live) is PlaybackDecision.Ready)
+        assertNull((PlaybackResolver(nowMillis = { 3_000L }).resolve(live) as PlaybackDecision.Ready).historyKey)
+    }
+
+    @Test
     fun `login gate is a client policy and only applies when enforced`() {
         val gated = item(kind = ContentKind.VIDEO).copy(loginRequired = true)
 

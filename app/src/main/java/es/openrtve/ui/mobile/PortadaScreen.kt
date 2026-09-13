@@ -17,7 +17,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -49,6 +53,15 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
+import es.openrtve.data.WatchEntry
+import es.openrtve.data.WatchHistory
+import androidx.compose.runtime.remember
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.HomeRow
 import es.openrtve.domain.RowLayout
@@ -73,6 +86,7 @@ fun PortadaScreen(
     onOpenRow: (HomeRow, String) -> Unit,
     onError: (String) -> Unit,
     onOpenSettings: (() -> Unit)? = null,
+    history: WatchHistory? = null,
 ) {
     val viewModel: PortadaViewModel = viewModel(
         key = "portada-$url",
@@ -81,6 +95,23 @@ fun PortadaScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val isRoot = onBack == null
+    val historyEntries by (history?.entries ?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle()
+    val resumable = remember(historyEntries) { history?.resumable.orEmpty() }
+
+    // Refresco como la app oficial: al volver a primer plano y, para los directos, cada minuto en pantalla.
+    LifecycleResumeEffect(viewModel) {
+        viewModel.onResumed()
+        onPauseOrDispose { }
+    }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(viewModel) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                delay(LIVE_REFRESH_MS)
+                viewModel.refreshLiveSections()
+            }
+        }
+    }
 
     state.error?.let { error ->
         val text = error.text(context)
@@ -100,10 +131,16 @@ fun PortadaScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             val startsWithHero = state.sections.firstOrNull()?.row?.layout == RowLayout.HERO
+            val listState = rememberLazyListState()
+            // La marca flota sobre el hero; en cuanto se hace scroll desaparece para no tapar tarjetas.
+            val showBrand by remember {
+                derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 200 }
+            }
             when {
                 state.isLoading -> LoadingPanel()
                 state.sections.isEmpty() -> EmptyPanel(stringResource(R.string.state_empty_home), viewModel::refresh)
                 else -> LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(22.dp),
                     modifier = Modifier.fillMaxSize(),
@@ -114,6 +151,10 @@ fun PortadaScreen(
                     if (state.isStale) {
                         item(key = "stale") { StaleBanner() }
                     }
+                    val heroFirst = startsWithHero && state.sections.first().state !is SectionState.Failed
+                    if (resumable.isNotEmpty() && !heroFirst) {
+                        item(key = "continue") { ContinueWatchingRow(resumable, onOpenItem) }
+                    }
                     items(state.sections, key = { it.row.id }) { section ->
                         SectionView(
                             section = section,
@@ -122,11 +163,23 @@ fun PortadaScreen(
                             onSeeAll = { onOpenRow(section.row, section.title) },
                             onRetry = { viewModel.retrySection(section.row) },
                         )
+                        // Tras el hero, como en la app oficial y en Findroid.
+                        if (heroFirst && resumable.isNotEmpty() && section.row.id == state.sections.first().row.id) {
+                            Spacer(Modifier.height(22.dp))
+                            ContinueWatchingRow(resumable, onOpenItem)
+                        }
                     }
                 }
             }
             if (isRoot) {
-                FloatingBrandBar(onOpenSettings)
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showBrand || state.isLoading || state.sections.isEmpty(),
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.TopCenter),
+                ) {
+                    FloatingBrandBar(onOpenSettings)
+                }
             }
         }
     }
@@ -159,6 +212,26 @@ private fun FloatingBrandBar(onOpenSettings: (() -> Unit)?) {
                 IconButton(onClick = onOpenSettings) {
                     Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings_title), tint = Color.White)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContinueWatchingRow(entries: List<WatchEntry>, onOpenItem: (CatalogItem) -> Unit) {
+    Column {
+        Text(
+            text = stringResource(R.string.continue_watching),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = ScreenPadding, end = 4.dp, bottom = 12.dp),
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = ScreenPadding),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(entries, key = { it.item.id }) { entry ->
+                ItemCard(entry.item, { onOpenItem(entry.item) }, Modifier.width(LandscapeWidth), progress = entry.progress)
             }
         }
     }
@@ -274,5 +347,6 @@ private fun PlaceholderRow(layout: RowLayout, fullBleedHero: Boolean) {
 }
 
 private val LandscapeWidth = 220.dp
+private const val LIVE_REFRESH_MS = 60_000L
 private val PosterWidth = 130.dp
 private val SquareWidth = 150.dp

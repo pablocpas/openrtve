@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,6 +55,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
+import es.openrtve.data.WatchHistory
+import androidx.compose.ui.draw.clip
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.VideoDetail
 import es.openrtve.ui.VideoViewModel
@@ -68,9 +71,10 @@ import es.openrtve.ui.text
 @Composable
 fun VideoScreen(
     repository: CatalogRepository,
+    history: WatchHistory,
     item: CatalogItem,
     onBack: () -> Unit,
-    onPlay: (CatalogItem) -> Unit,
+    onPlay: (CatalogItem, Boolean) -> Unit,
     onOpenProgram: (programId: String, title: String) -> Unit,
     onError: (String) -> Unit,
 ) {
@@ -81,6 +85,8 @@ fun VideoScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+    val historyEntries by history.entries.collectAsStateWithLifecycle()
+    val resume = remember(historyEntries, state.item.id) { history.entryFor(state.item.id)?.takeIf { it.positionMs > 0 } }
 
     state.error?.let { error ->
         val text = error.text(context)
@@ -124,14 +130,23 @@ fun VideoScreen(
                     Text(text = it, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(12.dp))
                 }
+                resume?.let {
+                    ProgressStrip(it.progress, Modifier.clip(CardShape))
+                    Spacer(Modifier.height(12.dp))
+                }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Button(onClick = { onPlay(state.item) }, modifier = Modifier.weight(1f)) {
+                    Button(onClick = { onPlay(state.item, false) }, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Filled.PlayArrow, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.action_play))
+                        Text(stringResource(if (resume != null) R.string.action_continue else R.string.action_play))
+                    }
+                    if (resume != null) {
+                        FilledTonalIconButton(onClick = { onPlay(state.item, true) }) {
+                            Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.action_restart))
+                        }
                     }
                     state.item.programId?.let { programId ->
                         FilledTonalIconButton(onClick = { onOpenProgram(programId, detail?.programTitle ?: state.item.subtitle.orEmpty()) }) {

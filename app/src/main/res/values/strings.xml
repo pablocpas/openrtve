@@ -52,6 +52,13 @@
     <string name="blocked_geo">No disponible en tu ubicación</string>
     <string name="blocked_login">Requiere una sesión autorizada</string>
     <string name="blocked_paid">Requiere una suscripción activa</string>
+    <string name="blocked_not_started">Todavía no ha empezado</string>
+    <string name="blocked_starts_at">Empieza %1$s</string>
+    <string name="schedule_today">Hoy</string>
+    <string name="schedule_tomorrow">Mañana</string>
+    <string name="continue_watching">Seguir viendo</string>
+    <string name="action_continue">Continuar</string>
+    <string name="action_restart">Desde el inicio</string>
     <string name="blocked_no_source">Este elemento todavía no tiene una fuente reproducible</string>
 
     <string name="kind_live">Directo</string>

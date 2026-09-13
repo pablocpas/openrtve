@@ -217,6 +217,7 @@ class PlayerActivity : ComponentActivity() {
      */
     override fun onStop() {
         super.onStop()
+        saveProgress()
         val player = controller ?: return
         val keepInBackground = request?.isAudioOnly == true && settings.current.backgroundAudio
         if (keepInBackground) return
@@ -263,9 +264,11 @@ class PlayerActivity : ComponentActivity() {
                         controller = connected
                         startRequested(connected)
                         liveTicker = lifecycleScope.launch {
+                            var ticks = 0
                             while (true) {
                                 delay(LIVE_TICK_MS)
                                 refreshLiveState()
+                                if (++ticks % PROGRESS_SAVE_EVERY_TICKS == 0 && controller?.isPlaying == true) saveProgress()
                             }
                         }
                     }
@@ -330,9 +333,24 @@ class PlayerActivity : ComponentActivity() {
 
     private fun play(player: MediaController, item: MediaItem) {
         errorRes = null
-        player.setMediaItem(item)
+        val resumeAt = request?.takeUnless { it.restart }?.historyKey
+            ?.let { history.entryFor(it)?.positionMs }
+            ?: 0L
+        if (resumeAt > 0) player.setMediaItem(item, resumeAt) else player.setMediaItem(item)
         player.prepare()
         player.play()
+    }
+
+    private val history get() = (application as OpenRtveApplication).container.watchHistory
+
+    /** Guarda la posición para "Seguir viendo"; el ticker lo llama cada segundo y onStop al salir. */
+    private fun saveProgress() {
+        val player = controller ?: return
+        val key = request?.historyKey ?: return
+        if (player.isCurrentMediaItemLive) return
+        val duration = player.duration
+        if (duration == C.TIME_UNSET || duration <= 0) return
+        history.updateProgress(key, player.currentPosition, duration)
     }
 
     private fun isWidevineAvailable(): Boolean =
@@ -396,6 +414,8 @@ class PlayerActivity : ComponentActivity() {
         val title: String,
         val drmTokenUrl: String?,
         val fallbackUri: String?,
+        val historyKey: String?,
+        val restart: Boolean,
     ) {
         val isAudioOnly: Boolean get() = mimeType.startsWith("audio/")
 
@@ -425,6 +445,8 @@ class PlayerActivity : ComponentActivity() {
                     title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
                     drmTokenUrl = intent.getStringExtra(EXTRA_DRM_TOKEN_URL),
                     fallbackUri = intent.getStringExtra(EXTRA_FALLBACK_URI),
+                    historyKey = intent.getStringExtra(EXTRA_HISTORY_KEY),
+                    restart = intent.getBooleanExtra(EXTRA_RESTART, false),
                 )
             }
         }
@@ -436,14 +458,18 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_TITLE = "playback_title"
         private const val EXTRA_DRM_TOKEN_URL = "playback_drm_token_url"
         private const val EXTRA_FALLBACK_URI = "playback_fallback_uri"
+        private const val EXTRA_HISTORY_KEY = "playback_history_key"
+        private const val EXTRA_RESTART = "playback_restart"
 
-        fun intent(context: Context, decision: PlaybackDecision.Ready): Intent =
+        fun intent(context: Context, decision: PlaybackDecision.Ready, restart: Boolean = false): Intent =
             Intent(context, PlayerActivity::class.java).apply {
                 putExtra(EXTRA_URI, decision.uri)
                 putExtra(EXTRA_MIME_TYPE, decision.mimeType)
                 putExtra(EXTRA_TITLE, decision.title)
                 putExtra(EXTRA_DRM_TOKEN_URL, decision.drm?.tokenUrl)
                 putExtra(EXTRA_FALLBACK_URI, decision.fallbackUri)
+                putExtra(EXTRA_HISTORY_KEY, decision.historyKey)
+                putExtra(EXTRA_RESTART, restart)
             }
     }
 }
@@ -575,6 +601,7 @@ private fun PlaybackScreen(
 
 private const val UNLOCK_VISIBLE_MS = 3_000L
 private const val LIVE_TICK_MS = 1_000L
+private const val PROGRESS_SAVE_EVERY_TICKS = 10
 private const val LIVE_EDGE_TOLERANCE_MS = 20_000L
 private const val DATA_SAVER_MAX_WIDTH = 1024
 private const val DATA_SAVER_MAX_HEIGHT = 576

@@ -7,6 +7,7 @@ import es.openrtve.data.DrmTokenClient
 import es.openrtve.data.RawDocumentCache
 import es.openrtve.data.RtveJsonParser
 import es.openrtve.data.SafeHttpsClient
+import es.openrtve.data.WatchHistory
 import es.openrtve.domain.PlaybackResolver
 import es.openrtve.domain.RtveHostPolicy
 import okhttp3.OkHttpClient
@@ -23,6 +24,7 @@ class AppContainer(context: Context) {
         cache = documentCache,
     )
     val settings = AppSettings(context)
+    val watchHistory = WatchHistory(context.filesDir.resolve("watch-history.json"))
     val playbackResolver = PlaybackResolver()
     val drmTokenClient = DrmTokenClient(httpClient)
 }

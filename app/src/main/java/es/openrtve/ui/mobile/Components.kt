@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import es.openrtve.ui.LocalNowMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,9 +47,11 @@ import es.openrtve.R
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.ContentKind
 import es.openrtve.ui.metaLine
+import es.openrtve.ui.scheduleLabel
 
 internal val CardShape = RoundedCornerShape(10.dp)
 internal val ScreenPadding = 16.dp
+
 
 /** Barra superior común: título, flecha atrás opcional y acciones. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -99,6 +102,59 @@ internal fun Artwork(
     }
 }
 
+/** Barra fina sobre el borde inferior de la imagen: progreso del directo o de "Seguir viendo". */
+@Composable
+internal fun ProgressStrip(progress: Float, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .background(Color.White.copy(alpha = 0.35f)),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .height(4.dp)
+                .background(MaterialTheme.colorScheme.primary),
+        )
+    }
+}
+
+/** Logo del canal, arriba a la izquierda, como en la app oficial. */
+@Composable
+internal fun ChannelLogo(url: String, modifier: Modifier = Modifier) {
+    AsyncImage(
+        model = url,
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        alignment = Alignment.CenterStart,
+        modifier = modifier
+            .padding(8.dp)
+            .height(22.dp)
+            .width(64.dp),
+    )
+}
+
+/** "● Directo" con punto rojo. */
+@Composable
+internal fun LiveDot(modifier: Modifier = Modifier) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
+        Box(
+            Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFE53935)),
+        )
+        Spacer(Modifier.width(5.dp))
+        Text(
+            text = stringResource(R.string.kind_live),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFFE53935),
+        )
+    }
+}
+
 @Composable
 internal fun LiveBadge(modifier: Modifier = Modifier) {
     Text(
@@ -117,12 +173,58 @@ internal fun LiveBadge(modifier: Modifier = Modifier) {
 private fun CatalogItem.liveOverlay(): @Composable BoxScope.() -> Unit =
     if (kind == ContentKind.LIVE) { { LiveBadge(Modifier.align(Alignment.TopStart)) } } else { {} }
 
-/** Tarjeta apaisada 16:9 con texto debajo, como `ItemCard` de Findroid. */
+/**
+ * Tarjeta apaisada 16:9 con texto debajo, como `ItemCard` de Findroid. Los
+ * directos llevan el logo del canal, "● Directo" y el progreso de la emisión; los
+ * programados, su horario. [progress] pinta el avance de "Seguir viendo".
+ */
 @Composable
-internal fun ItemCard(item: CatalogItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun ItemCard(
+    item: CatalogItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    progress: Float? = null,
+) {
+    val live = item.live
+    val now = LocalNowMillis.current
+    val context = LocalContext.current
+    val liveProgress = live?.takeIf { it.isOnAir }?.progressAt(now)
     Column(modifier = modifier.clip(CardShape).clickable(onClick = onClick)) {
-        Artwork(item.imageUrl, 16f / 9f, Modifier.fillMaxWidth(), overlay = item.liveOverlay())
-        CardCaption(item.title, item.subtitle)
+        Artwork(item.imageUrl, 16f / 9f, Modifier.fillMaxWidth()) {
+            live?.channelLogoUrl?.let { ChannelLogo(it, Modifier.align(Alignment.TopStart)) }
+            (progress ?: liveProgress)?.let { ProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
+        }
+        Spacer(Modifier.height(6.dp))
+        when {
+            live == null -> Unit
+            live.isUpcomingAt(now) -> Text(
+                text = listOfNotNull(live.scheduleLabel(context, now), live.category).joinToString(" · "),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            else -> LiveDot()
+        }
+        Text(
+            text = item.title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (live == null || !live.isUpcomingAt(now)) {
+            item.subtitle?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
     }
 }
 
@@ -209,12 +311,14 @@ internal fun HeroPager(
                             ),
                         ),
                 )
-                if (item.kind == ContentKind.LIVE) LiveBadge(Modifier.align(Alignment.TopStart))
+                item.live?.channelLogoUrl?.let { ChannelLogo(it, Modifier.align(Alignment.TopStart).padding(4.dp)) }
+                    ?: if (item.kind == ContentKind.LIVE) LiveBadge(Modifier.align(Alignment.TopStart)) else Unit
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(16.dp),
                 ) {
+                    if (item.live?.isOnAir == true) LiveDot(Modifier.padding(bottom = 4.dp))
                     Text(
                         text = item.title,
                         style = MaterialTheme.typography.titleLarge,

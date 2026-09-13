@@ -12,8 +12,14 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.platform.LocalContext
+import es.openrtve.ui.LocalNowMillis
+import es.openrtve.ui.scheduleLabel
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -123,6 +129,56 @@ internal fun TvArtwork(url: String?, modifier: Modifier = Modifier) {
 }
 
 @Composable
+internal fun TvProgressStrip(progress: Float, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(5.dp)
+            .background(Color.White.copy(alpha = 0.35f)),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .height(5.dp)
+                .background(MaterialTheme.colorScheme.primary),
+        )
+    }
+}
+
+@Composable
+internal fun TvChannelLogo(url: String, modifier: Modifier = Modifier) {
+    AsyncImage(
+        model = url,
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        alignment = Alignment.CenterStart,
+        modifier = modifier
+            .padding(10.dp)
+            .height(26.dp)
+            .width(80.dp),
+    )
+}
+
+@Composable
+internal fun TvLiveDot(modifier: Modifier = Modifier) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
+        Box(
+            Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFE53935)),
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = stringResource(R.string.kind_live),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFFE53935),
+        )
+    }
+}
+
+@Composable
 internal fun TvLiveBadge(modifier: Modifier = Modifier) {
     Text(
         text = stringResource(R.string.kind_live).uppercase(),
@@ -144,25 +200,42 @@ internal fun TvItemCard(
     layout: RowLayout,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    progress: Float? = null,
 ) {
     val image = when (layout) {
         RowLayout.POSTER -> item.posterUrl ?: item.imageUrl
         RowLayout.SQUARE -> item.squareUrl ?: item.imageUrl ?: item.posterUrl
         else -> item.imageUrl
     }
+    val live = item.live
+    val now = LocalNowMillis.current
+    val context = LocalContext.current
+    val liveProgress = live?.takeIf { it.isOnAir }?.progressAt(now)
     Column(modifier) {
         TvFocusSurface(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(layout.aspectRatio())) {
             TvArtwork(image, Modifier.fillMaxSize())
-            if (item.kind == ContentKind.LIVE) TvLiveBadge(Modifier.align(Alignment.TopStart))
+            live?.channelLogoUrl?.let { TvChannelLogo(it, Modifier.align(Alignment.TopStart)) }
+            (progress ?: liveProgress)?.let { TvProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
         }
         Spacer(Modifier.height(10.dp))
+        when {
+            live == null -> Unit
+            live.isUpcomingAt(now) -> Text(
+                text = listOfNotNull(live.scheduleLabel(context, now), live.category).joinToString(" · "),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            else -> TvLiveDot()
+        }
         Text(
             text = item.title,
             style = MaterialTheme.typography.titleSmall,
             maxLines = if (layout == RowLayout.POSTER) 2 else 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (layout != RowLayout.POSTER) {
+        if (layout != RowLayout.POSTER && (live == null || !live.isUpcomingAt(now))) {
             item.subtitle?.let {
                 Text(
                     text = it,

@@ -21,6 +21,8 @@ de la Corporación de Radio y Televisión Española.
   vídeo o película (fondo, sinopsis, ficha técnica, reparto).
 - **Buscador** con los filtros rápidos de la app oficial y resultados por
   bloque; **categorías** leídas de la configuración remota de RTVE.
+- **Directos** con logo del canal, "● Directo" y progreso de la emisión;
+  los programados muestran su horario. **Seguir viendo** local, sin cuenta.
 - **Reproductor** Media3 con controles propios (pista de audio, subtítulos,
   velocidad, ajuste de imagen, imagen en imagen, bloqueo), gestos (doble toque
   para saltar, deslizar para brillo y volumen), indicador de directo con

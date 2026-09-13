@@ -5,6 +5,7 @@ enum class BlockReason {
     LOGIN_REQUIRED,
     SUBSCRIPTION_REQUIRED,
     NO_SOURCE,
+    NOT_STARTED_YET,
 }
 
 /**
@@ -21,6 +22,9 @@ sealed interface PlaybackDecision {
         val drm: DrmSpec? = null,
         /** Variante sin protección para dispositivos sin Widevine. */
         val fallbackUri: String? = null,
+        /** Clave del item en "Seguir viendo"; `null` si no se guarda progreso (directos). */
+        val historyKey: String? = null,
+        val resumePositionMs: Long = 0L,
     ) : PlaybackDecision {
         val isAudioOnly: Boolean get() = mimeType.startsWith("audio/")
     }
@@ -36,10 +40,14 @@ sealed interface PlaybackDecision {
 class PlaybackResolver(
     private val hostPolicy: RtveHostPolicy = RtveHostPolicy(),
     private val enforceLoginGate: Boolean = false,
+    private val nowMillis: () -> Long = System::currentTimeMillis,
 ) {
     fun resolve(item: CatalogItem): PlaybackDecision {
         if (item.allowedInCountry == false) {
             return PlaybackDecision.Blocked(BlockReason.GEO_RESTRICTED)
+        }
+        if (item.live?.isUpcomingAt(nowMillis()) == true) {
+            return PlaybackDecision.Blocked(BlockReason.NOT_STARTED_YET)
         }
         if (enforceLoginGate && item.loginRequired) {
             return PlaybackDecision.Blocked(BlockReason.LOGIN_REQUIRED)
@@ -63,6 +71,7 @@ class PlaybackResolver(
             title = if (item.kind == ContentKind.PROGRAM) item.subtitle ?: item.title else item.title,
             drm = source.drm,
             fallbackUri = source.fallbackUri,
+            historyKey = item.id.takeIf { item.kind != ContentKind.LIVE },
         )
     }
 

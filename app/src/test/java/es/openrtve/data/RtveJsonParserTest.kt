@@ -248,6 +248,32 @@ class RtveJsonParserTest {
     }
 
     @Test
+    fun `live items carry schedule, progress, logo and category`() {
+        val items = parser.parseModule(
+            raw = """{"page":{"items":[
+              {"id":"80745","tipo":"peticion","titulo":"Etapa 21","antetitulo":"LA VUELTA 2026","live":false,"inicio":"13-09-2026 16:10:00","duracion":235,"porcentaje":0,"idAsset":"6712432","logo":"https://css.rtve.es/css/logo.png"},
+              {"id":"1","tipo":"broadcast","titulo":"VIAJE AL CENTRO DE LA TELE","live":true,"inicio":"13-09-2026 11:05:00","duracion":60,"porcentaje":50,"idAsset":"1688877"}
+            ]}}""",
+            fallbackTitle = "Directos",
+        ).items
+
+        val upcoming = items[0].live!!
+        assertFalse(upcoming.isOnAir)
+        assertEquals("La Vuelta 2026", upcoming.category)
+        assertEquals("La Vuelta 2026", items[0].subtitle)
+        assertEquals("https://css.rtve.es/css/logo.png", upcoming.channelLogoUrl)
+        // 16:10 en Madrid (CEST, UTC+2) = 14:10 UTC.
+        assertEquals(1789308600000L, upcoming.startsAtMillis)
+        assertTrue(upcoming.isUpcomingAt(1789308000000L))
+        assertFalse(upcoming.isUpcomingAt(1789309000000L))
+
+        val onAir = items[1].live!!
+        assertTrue(onAir.isOnAir)
+        // 11:05 Madrid + 30 min de 60 = 50 %.
+        assertEquals(0.5f, onAir.progressAt(1789290300000L + 30 * 60_000L)!!, 0.01f)
+    }
+
+    @Test
     fun `fast channels without title get one from description or permalink`() {
         val result = parser.parseModule(
             raw = """{"page":{"items":[

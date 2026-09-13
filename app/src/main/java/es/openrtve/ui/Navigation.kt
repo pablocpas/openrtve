@@ -25,6 +25,8 @@ sealed interface UiMessage {
     data class Error(val error: LoadError) : UiMessage
     data class Blocked(val reason: BlockReason) : UiMessage
     data class Text(val text: String) : UiMessage
+    /** Directo programado: "Empieza hoy · 16:10". */
+    data class StartsAt(val schedule: String) : UiMessage
 }
 
 data class NavigationState(

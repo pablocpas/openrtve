@@ -65,6 +65,23 @@ class PortadaViewModel(
 
     fun refresh() = load(forceRefresh = true)
 
+    private var lastLoadedAtMillis = 0L
+
+    /** Al volver a primer plano: si la portada tiene más de [REFRESH_AFTER_MS] (el `refresh` de la configuración oficial), se recarga. */
+    fun onResumed() {
+        if (System.currentTimeMillis() - lastLoadedAtMillis > REFRESH_AFTER_MS && !mutableUiState.value.isLoading) {
+            load(forceRefresh = false)
+        }
+    }
+
+    /** Las filas de directos cambian cada pocos minutos: se recargan solas mientras la pantalla está visible. */
+    fun refreshLiveSections() {
+        val scope = sectionsScope ?: return
+        mutableUiState.value.sections
+            .filter { it.row.isLive && it.state !is SectionState.Loading }
+            .forEach { section -> scope.launch { loadSection(section.row, forceRefresh = true) } }
+    }
+
     fun dismissError() {
         mutableUiState.update { it.copy(error = null) }
     }
@@ -99,6 +116,7 @@ class PortadaViewModel(
             }
 
             val rows = feed.value.rows.filter { it.contentUrl != null }
+            lastLoadedAtMillis = System.currentTimeMillis()
             mutableUiState.update {
                 it.copy(
                     title = feed.value.title.trim(),
@@ -149,5 +167,6 @@ class PortadaViewModel(
 
     private companion object {
         const val MAX_PARALLEL_SECTION_LOADS = 6
+        const val REFRESH_AFTER_MS = 120_000L
     }
 }

@@ -42,6 +42,15 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
+import es.openrtve.data.WatchEntry
+import es.openrtve.data.WatchHistory
+import es.openrtve.ui.LocalNowMillis
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.HomeRow
 import es.openrtve.domain.RowLayout
@@ -62,6 +71,7 @@ fun TvPortadaScreen(
     onOpenItem: (CatalogItem) -> Unit,
     onOpenRow: (HomeRow, String) -> Unit,
     onError: (String) -> Unit,
+    history: WatchHistory? = null,
 ) {
     val viewModel: PortadaViewModel = viewModel(
         key = "portada-$url",
@@ -70,6 +80,22 @@ fun TvPortadaScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val firstRowFocus = remember { FocusRequester() }
+    val historyEntries by (history?.entries ?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle()
+    val resumable = remember(historyEntries) { history?.resumable.orEmpty() }
+
+    LifecycleResumeEffect(viewModel) {
+        viewModel.onResumed()
+        onPauseOrDispose { }
+    }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(viewModel) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                delay(LIVE_REFRESH_MS)
+                viewModel.refreshLiveSections()
+            }
+        }
+    }
 
     state.error?.let { error ->
         val text = error.text(context)
@@ -96,7 +122,12 @@ fun TvPortadaScreen(
             } else {
                 item(key = "top") { Spacer(Modifier.height(TvVerticalMargin)) }
             }
+            val firstId = state.sections.first().row.id
             items(state.sections, key = { it.row.id }) { section ->
+                if (resumable.isNotEmpty() && section.row.id == firstId && section.row.layout != RowLayout.HERO) {
+                    TvContinueWatching(resumable, onOpenItem)
+                    Spacer(Modifier.height(28.dp))
+                }
                 TvSection(
                     section = section,
                     modifier = if (section.row.id == firstLoadedId) Modifier.focusRequester(firstRowFocus) else Modifier,
@@ -104,6 +135,27 @@ fun TvPortadaScreen(
                     onSeeAll = { onOpenRow(section.row, section.title) },
                     onRetry = { viewModel.retrySection(section.row) },
                 )
+                if (resumable.isNotEmpty() && section.row.id == firstId && section.row.layout == RowLayout.HERO) {
+                    Spacer(Modifier.height(28.dp))
+                    TvContinueWatching(resumable, onOpenItem)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvContinueWatching(entries: List<WatchEntry>, onOpenItem: (CatalogItem) -> Unit) {
+    Column {
+        TvSectionTitle(stringResource(R.string.continue_watching))
+        Spacer(Modifier.height(12.dp))
+        LazyRow(
+            contentPadding = TvRowPadding,
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            modifier = Modifier.focusRestorer(),
+        ) {
+            items(entries, key = { it.item.id }) { entry ->
+                TvItemCard(entry.item, RowLayout.LANDSCAPE, { onOpenItem(entry.item) }, Modifier.width(TvLandscapeWidth), progress = entry.progress)
             }
         }
     }
@@ -182,12 +234,14 @@ private fun TvHeroRow(items: List<CatalogItem>, onOpenItem: (CatalogItem) -> Uni
                         .fillMaxSize()
                         .background(Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.9f))),
                 )
-                if (item.kind == es.openrtve.domain.ContentKind.LIVE) TvLiveBadge(Modifier.align(Alignment.TopStart))
+                item.live?.channelLogoUrl?.let { TvChannelLogo(it, Modifier.align(Alignment.TopStart)) }
+                item.live?.takeIf { it.isOnAir }?.progressAt(LocalNowMillis.current)?.let { TvProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(16.dp),
                 ) {
+                    if (item.live?.isOnAir == true) TvLiveDot(Modifier.padding(bottom = 4.dp))
                     Text(
                         text = item.title,
                         style = MaterialTheme.typography.titleLarge,
@@ -206,3 +260,4 @@ private fun TvHeroRow(items: List<CatalogItem>, onOpenItem: (CatalogItem) -> Uni
 }
 
 private val TvHeroWidth = 380.dp
+private const val LIVE_REFRESH_MS = 60_000L

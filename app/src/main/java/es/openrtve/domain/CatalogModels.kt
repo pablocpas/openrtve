@@ -35,7 +35,12 @@ data class HomeRow(
     val presentation: String?,
     val contentUrl: String?,
     val layout: RowLayout = RowLayout.LANDSCAPE,
-)
+) {
+    /** Fila de directos: su contenido caduca en minutos. */
+    val isLive: Boolean
+        get() = presentation?.lowercase()?.let { it.startsWith("directos") || it == "modulodirectoradio" } == true ||
+            moduleType.equals("livesCollection", ignoreCase = true)
+}
 
 enum class ContentKind {
     PROGRAM,
@@ -71,8 +76,37 @@ data class CatalogItem(
     val publicationDate: String? = null,
     val episode: Int? = null,
     val seasonTitle: String? = null,
+    /** Solo en directos: emisión en curso o programada. */
+    val live: LiveInfo? = null,
 ) {
     val needsAccount: Boolean get() = loginRequired || paid || drm
+}
+
+/**
+ * Lo que el feed de directos sabe de la emisión: si está en el aire, cuándo
+ * empieza, cuánto dura y el logo del canal. Las horas del feed son de Madrid.
+ */
+data class LiveInfo(
+    val isOnAir: Boolean,
+    val startsAtMillis: Long?,
+    val durationMinutes: Int?,
+    /** Progreso que envía el feed; la UI lo recalcula con el reloj si conoce inicio y duración. */
+    val progressPercent: Int?,
+    val channelLogoUrl: String?,
+    val category: String?,
+) {
+    fun progressAt(nowMillis: Long): Float? {
+        val start = startsAtMillis
+        val minutes = durationMinutes
+        if (start != null && minutes != null && minutes > 0) {
+            return ((nowMillis - start).toFloat() / (minutes * 60_000L)).coerceIn(0f, 1f)
+        }
+        return progressPercent?.let { (it / 100f).coerceIn(0f, 1f) }
+    }
+
+    /** Programado y aún no empezado según el reloj. */
+    fun isUpcomingAt(nowMillis: Long): Boolean =
+        !isOnAir && startsAtMillis != null && startsAtMillis > nowMillis
 }
 
 data class CatalogModule(

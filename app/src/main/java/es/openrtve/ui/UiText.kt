@@ -4,6 +4,7 @@ import android.content.Context
 import es.openrtve.R
 import es.openrtve.domain.BlockReason
 import es.openrtve.domain.CatalogItem
+import es.openrtve.domain.LiveInfo
 import es.openrtve.domain.VideoDetail
 
 fun LoadError.text(context: Context): String = when (this) {
@@ -18,12 +19,31 @@ fun BlockReason.text(context: Context): String = when (this) {
     BlockReason.LOGIN_REQUIRED -> context.getString(R.string.blocked_login)
     BlockReason.SUBSCRIPTION_REQUIRED -> context.getString(R.string.blocked_paid)
     BlockReason.NO_SOURCE -> context.getString(R.string.blocked_no_source)
+    BlockReason.NOT_STARTED_YET -> context.getString(R.string.blocked_not_started)
+}
+
+/** "Hoy · 16:10" o "Mañana · 16:10" o "15/09 · 16:10", según el reloj. */
+fun LiveInfo.scheduleLabel(context: Context, nowMillis: Long): String? {
+    val start = startsAtMillis ?: return null
+    val zone = java.util.TimeZone.getDefault()
+    val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).apply { timeZone = zone }.format(start)
+    val dayFormat = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.ROOT).apply { timeZone = zone }
+    val startDay = dayFormat.format(start).toInt()
+    val today = dayFormat.format(nowMillis).toInt()
+    val tomorrow = dayFormat.format(nowMillis + 24L * 60 * 60 * 1_000).toInt()
+    val day = when (startDay) {
+        today -> context.getString(R.string.schedule_today)
+        tomorrow -> context.getString(R.string.schedule_tomorrow)
+        else -> java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault()).apply { timeZone = zone }.format(start)
+    }
+    return "$day · $time"
 }
 
 fun UiMessage.text(context: Context): String = when (this) {
     is UiMessage.Error -> error.text(context)
     is UiMessage.Blocked -> reason.text(context)
     is UiMessage.Text -> text
+    is UiMessage.StartsAt -> context.getString(R.string.blocked_starts_at, schedule)
 }
 
 /** "Temporada 1 · E3 · 12/09/2026 · 52 min", omitiendo lo que falte. */

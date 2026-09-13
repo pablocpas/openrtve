@@ -36,6 +36,8 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
+import es.openrtve.data.WatchHistory
+import androidx.compose.runtime.remember
 import es.openrtve.domain.CatalogItem
 import es.openrtve.ui.VideoViewModel
 import es.openrtve.ui.feedDateToDisplay
@@ -46,8 +48,9 @@ import es.openrtve.ui.text
 @Composable
 fun TvVideoScreen(
     repository: CatalogRepository,
+    history: WatchHistory,
     item: CatalogItem,
-    onPlay: (CatalogItem) -> Unit,
+    onPlay: (CatalogItem, Boolean) -> Unit,
     onOpenProgram: (programId: String, title: String) -> Unit,
     onError: (String) -> Unit,
 ) {
@@ -58,6 +61,8 @@ fun TvVideoScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val background = MaterialTheme.colorScheme.background
+    val historyEntries by history.entries.collectAsStateWithLifecycle()
+    val resume = remember(historyEntries, state.item.id) { history.entryFor(state.item.id)?.takeIf { it.positionMs > 0 } }
 
     state.error?.let { error ->
         val text = error.text(context)
@@ -102,7 +107,12 @@ fun TvVideoScreen(
             }
             Spacer(Modifier.height(20.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = { onPlay(state.item) }, modifier = Modifier.initialFocus()) { Text(stringResource(R.string.action_play)) }
+                Button(onClick = { onPlay(state.item, false) }, modifier = Modifier.initialFocus()) {
+                    Text(stringResource(if (resume != null) R.string.action_continue else R.string.action_play))
+                }
+                if (resume != null) {
+                    Button(onClick = { onPlay(state.item, true) }) { Text(stringResource(R.string.action_restart)) }
+                }
                 state.item.programId?.let { programId ->
                     Button(onClick = { onOpenProgram(programId, detail?.programTitle ?: state.item.subtitle.orEmpty()) }) {
                         Text(stringResource(R.string.action_open_program))

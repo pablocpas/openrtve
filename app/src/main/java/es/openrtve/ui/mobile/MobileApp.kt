@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import es.openrtve.AppContainer
 import es.openrtve.R
+import es.openrtve.domain.BlockReason
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.ContentKind
 import es.openrtve.domain.PlaybackDecision
@@ -34,7 +35,11 @@ import es.openrtve.ui.Destination
 import es.openrtve.ui.NavigationViewModel
 import es.openrtve.ui.Tab
 import es.openrtve.ui.UiMessage
+import es.openrtve.ui.scheduleLabel
 import es.openrtve.ui.text
+import androidx.compose.runtime.CompositionLocalProvider
+import es.openrtve.ui.LocalNowMillis
+import es.openrtve.ui.rememberNowMillis
 
 @Composable
 fun MobileApp(container: AppContainer) {
@@ -55,12 +60,23 @@ fun MobileApp(container: AppContainer) {
         }
     }
 
-    val playItem: (CatalogItem) -> Unit = { item ->
+    val play: (CatalogItem, Boolean) -> Unit = { item, restart ->
         when (val decision = playbackResolver.resolve(item)) {
-            is PlaybackDecision.Ready -> context.startActivity(PlayerActivity.intent(context, decision))
-            is PlaybackDecision.Blocked -> navigation.show(UiMessage.Blocked(decision.reason))
+            is PlaybackDecision.Ready -> {
+                container.watchHistory.register(item)
+                context.startActivity(PlayerActivity.intent(context, decision, restart))
+            }
+            is PlaybackDecision.Blocked -> {
+                val schedule = item.live?.scheduleLabel(context, System.currentTimeMillis())
+                if (decision.reason == BlockReason.NOT_STARTED_YET && schedule != null) {
+                    navigation.show(UiMessage.StartsAt(schedule))
+                } else {
+                    navigation.show(UiMessage.Blocked(decision.reason))
+                }
+            }
         }
     }
+    val playItem: (CatalogItem) -> Unit = { play(it, false) }
     // Programas y vídeos abren su ficha; directos y audios se reproducen al momento.
     val openItem: (CatalogItem) -> Unit = { item ->
         when (item.kind) {
@@ -71,6 +87,8 @@ fun MobileApp(container: AppContainer) {
     }
     val showError: (String) -> Unit = { navigation.show(UiMessage.Text(it)) }
 
+    val nowMillis = rememberNowMillis()
+    CompositionLocalProvider(LocalNowMillis provides nowMillis) {
     Scaffold(
         bottomBar = {
             NavigationBar {
@@ -132,9 +150,10 @@ fun MobileApp(container: AppContainer) {
                 )
                 is Destination.Video -> VideoScreen(
                     repository = repository,
+                    history = container.watchHistory,
                     item = destination.item,
                     onBack = navigation::pop,
-                    onPlay = playItem,
+                    onPlay = play,
                     onOpenProgram = { id, title -> navigation.push(Destination.Program(programStub(id, title))) },
                     onError = showError,
                 )
@@ -143,6 +162,7 @@ fun MobileApp(container: AppContainer) {
                         repository = repository,
                         url = RtveUrls.TV_HOME,
                         title = "",
+                        history = container.watchHistory,
                         onBack = null,
                         onOpenItem = openItem,
                         onOpenRow = { row, title -> navigation.push(Destination.Module(row, title)) },
@@ -162,6 +182,7 @@ fun MobileApp(container: AppContainer) {
                 }
             }
         }
+    }
     }
 }
 
