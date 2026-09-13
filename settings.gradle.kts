@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "OpenRTVE"
 include(":app")
+include(":baselineprofile")

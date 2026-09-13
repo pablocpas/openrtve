@@ -18,9 +18,13 @@ import java.net.URLEncoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** Ausencia de copia local cuando se pidió solo caché. */
+class NotCachedException : NoSuchElementException("Sin copia local")
+
 interface CatalogRepository {
-    suspend fun loadPortada(url: String, forceRefresh: Boolean = false): CatalogLoad<HomeFeed>
-    suspend fun loadModule(row: HomeRow, forceRefresh: Boolean = false): CatalogLoad<CatalogModule>
+    /** Con [cachedOnly], devuelve la copia local de cualquier antigüedad sin tocar la red, o lanza [NotCachedException]. */
+    suspend fun loadPortada(url: String, forceRefresh: Boolean = false, cachedOnly: Boolean = false): CatalogLoad<HomeFeed>
+    suspend fun loadModule(row: HomeRow, forceRefresh: Boolean = false, cachedOnly: Boolean = false): CatalogLoad<CatalogModule>
     suspend fun loadExplore(forceRefresh: Boolean = false): CatalogLoad<List<ExploreGroup>>
     suspend fun loadQuickFilters(): CatalogLoad<List<QuickFilter>>
     suspend fun loadQuickFilterItems(filter: QuickFilter): CatalogLoad<CatalogModule>
@@ -56,11 +60,13 @@ class DefaultCatalogRepository(
     override suspend fun loadPortada(
         url: String,
         forceRefresh: Boolean,
+        cachedOnly: Boolean,
     ): CatalogLoad<HomeFeed> = loadDocument(
         url = url,
         forceRefresh = forceRefresh,
         freshForMillis = HOME_FRESH_MS,
         staleForMillis = HOME_STALE_MS,
+        cachedOnly = cachedOnly,
         parse = parser::parseHome,
     )
 
@@ -97,6 +103,7 @@ class DefaultCatalogRepository(
     override suspend fun loadModule(
         row: HomeRow,
         forceRefresh: Boolean,
+        cachedOnly: Boolean,
     ): CatalogLoad<CatalogModule> {
         val url = requireNotNull(row.contentUrl) { "Este módulo no tiene una fuente remota" }
         return loadDocument(
@@ -104,6 +111,7 @@ class DefaultCatalogRepository(
             forceRefresh = forceRefresh,
             freshForMillis = MODULE_FRESH_MS,
             staleForMillis = MODULE_STALE_MS,
+            cachedOnly = cachedOnly,
             parse = { parser.parseModule(it, row.title) },
         )
     }
@@ -170,6 +178,7 @@ class DefaultCatalogRepository(
         freshForMillis: Long,
         staleForMillis: Long,
         parse: (String) -> T,
+        cachedOnly: Boolean = false,
     ): CatalogLoad<T> = withContext(Dispatchers.IO) {
         val now = nowMillis()
         val cached = cache.read(url)
@@ -177,6 +186,9 @@ class DefaultCatalogRepository(
         // Solo se parsea la copia local cuando hace falta: está fresca o la red falla.
         val cachedValue: T? by lazy { cached?.let { runCatching { parse(it.raw) }.getOrNull() } }
 
+        if (cachedOnly) {
+            return@withContext cachedValue?.let { CatalogLoad(it, isStale = age > freshForMillis) } ?: throw NotCachedException()
+        }
         if (!forceRefresh && age <= freshForMillis) {
             cachedValue?.let { return@withContext CatalogLoad(it, isStale = false) }
         }

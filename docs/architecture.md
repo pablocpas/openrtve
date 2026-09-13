@@ -59,6 +59,15 @@ Datos, estado y política son comunes. Las superficies no lo son:
 No se decide la UI por orientación o por un ancho fijo. La actividad elegida
 por el launcher determina móvil/TV y cada shell responde al espacio disponible.
 
+## Arranque
+
+La portada raíz se pinta primero desde la copia local (`cachedOnly`), sin
+esperar a la red, y después se revalida: las filas que ya estaban conservan su
+contenido y solo cambian si la respuesta difiere. Sin red, esa copia se marca
+como antigua en vez de mostrar un error. El Baseline Profile del módulo
+`baselineprofile` recorre portada, Explorar, una categoría, Buscar, una ficha y
+el reproductor; el plugin lo incrusta en el release como `assets/dexopt/baseline.prof`.
+
 ## Directos, "Seguir viendo" y refresco
 
 El feed de directos trae programa en emisión (`titulo`), categoría

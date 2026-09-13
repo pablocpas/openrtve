@@ -100,6 +100,17 @@ depuración para que siga siendo instalable. Keystore y propiedades están en
 `.gitignore` y `.dockerignore`: guarda una copia, sin esa clave no se pueden
 publicar actualizaciones sobre la app instalada.
 
+### Baseline Profile
+
+El release incluye un Baseline Profile (`app/src/release/generated/baselineProfiles/`)
+que ART usa al instalar para precompilar los caminos calientes: arranque en
+frío y primeros scrolls más rápidos en cualquier dispositivo. Se regenera con
+un emulador o móvil conectado (imagen `google_apis` o `aosp`, con `adb root`):
+
+```bash
+./gradlew :app:generateBaselineProfile
+```
+
 ## Diseño del código
 
 Un único módulo `app`; los paquetes separan responsabilidades que ya tienen

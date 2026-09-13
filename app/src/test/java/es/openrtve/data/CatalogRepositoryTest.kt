@@ -82,6 +82,23 @@ class CatalogRepositoryTest {
     }
 
     @Test
+    fun `cached only returns any local copy without network and fails when there is none`() = runBlocking {
+        try {
+            repository.loadPortada(RtveUrls.TV_HOME, cachedOnly = true)
+            fail("sin copia local")
+        } catch (_: NotCachedException) {
+        }
+        client.response = { home("Primera") }
+        repository.loadPortada(RtveUrls.TV_HOME)
+
+        now += 3 * 60 * 60_000
+        val copy = repository.loadPortada(RtveUrls.TV_HOME, cachedOnly = true)
+        assertEquals("Primera", copy.value.title)
+        assertTrue("caducada pero disponible", copy.isStale)
+        assertEquals(1, client.calls)
+    }
+
+    @Test
     fun `too old cache is not used and the network error surfaces`() = runBlocking {
         client.response = { home("Primera") }
         repository.loadPortada(RtveUrls.TV_HOME)

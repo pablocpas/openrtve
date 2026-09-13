@@ -102,6 +102,9 @@ class PortadaViewModel(
             viewModelScope.coroutineContext + SupervisorJob(viewModelScope.coroutineContext[Job]),
         ).also { sectionsScope = it }
         feedJob = viewModelScope.launch {
+            // Primero la copia local, aunque esté caducada: la portada aparece al
+            // instante y la red solo la revalida (con ETag, un 304 si no cambió).
+            if (mutableUiState.value.sections.isEmpty()) showCachedCopy(scope)
             val hadSections = mutableUiState.value.sections.isNotEmpty()
             mutableUiState.update { it.copy(isLoading = !hadSections, isRefreshing = hadSections, error = null) }
             val feed = try {
@@ -109,24 +112,75 @@ class PortadaViewModel(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                mutableUiState.update {
-                    it.copy(isLoading = false, isRefreshing = false, error = error.toLoadError())
+                mutableUiState.update { ui ->
+                    ui.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        // Con copia local mostrada, un fallo de red solo la marca como antigua.
+                        isFeedStale = hadSections,
+                        error = if (hadSections) null else error.toLoadError(),
+                    )
                 }
                 return@launch
             }
 
             val rows = feed.value.rows.filter { it.contentUrl != null }
             lastLoadedAtMillis = System.currentTimeMillis()
-            mutableUiState.update {
-                it.copy(
+            mutableUiState.update { ui ->
+                val previous = ui.sections.associateBy { it.row.contentUrl }
+                ui.copy(
                     title = feed.value.title.trim(),
-                    sections = rows.map { row -> HomeSection(row, SectionState.Loading) },
+                    // Las filas que ya estaban conservan su contenido mientras se revalidan.
+                    sections = rows.map { row ->
+                        previous[row.contentUrl]?.copy(row = row) ?: HomeSection(row, SectionState.Loading)
+                    },
                     isLoading = false,
                     isRefreshing = false,
                     isFeedStale = feed.isStale,
                 )
             }
             rows.forEach { row -> scope.launch { loadSection(row, forceRefresh) } }
+        }
+    }
+
+    private suspend fun showCachedCopy(scope: CoroutineScope) {
+        val cached = try {
+            repository.loadPortada(url, cachedOnly = true)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            return
+        }
+        val rows = cached.value.rows.filter { it.contentUrl != null }
+        mutableUiState.update {
+            it.copy(
+                title = cached.value.title.trim(),
+                sections = rows.map { row -> HomeSection(row, SectionState.Loading) },
+                isLoading = false,
+            )
+        }
+        rows.forEach { row ->
+            scope.launch {
+                val module = try {
+                    repository.loadModule(row, cachedOnly = true)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    return@launch
+                }
+                // Solo si la fila sigue pendiente: la revalidación puede haber llegado antes.
+                mutableUiState.update { ui ->
+                    ui.copy(
+                        sections = ui.sections.map { section ->
+                            if (section.row.id == row.id && section.state is SectionState.Loading) {
+                                section.copy(state = SectionState.Loaded(module.value.items, isStale = false), title = module.value.title.ifBlank { section.title })
+                            } else {
+                                section
+                            }
+                        },
+                    )
+                }
+            }
         }
     }
 

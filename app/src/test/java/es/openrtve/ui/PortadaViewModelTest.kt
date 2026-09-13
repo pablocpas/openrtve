@@ -1,6 +1,7 @@
 package es.openrtve.ui
 
 import es.openrtve.data.CatalogRepository
+import es.openrtve.data.NotCachedException
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.CatalogLoad
 import es.openrtve.domain.CatalogModule
@@ -24,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -69,6 +71,47 @@ class PortadaViewModelTest {
         val loaded = viewModel.uiState.value
         assertEquals("Nueva", loaded.title)
         assertEquals(2, (loaded.sections.single().state as SectionState.Loaded).items.size)
+    }
+
+    @Test
+    fun `a cached copy shows instantly and the network only revalidates`() = runTest(dispatcher) {
+        repository.cachedFeed = feed("Antigua", rows = 2)
+        repository.cachedModules[0] = module(items = 3)
+        val viewModel = PortadaViewModel(repository, URL)
+        dispatcher.scheduler.runCurrent()
+
+        val instant = viewModel.uiState.value
+        assertFalse("la copia local se pinta sin esperar a la red", instant.isLoading)
+        assertTrue(instant.isRefreshing)
+        assertEquals("Antigua", instant.title)
+        assertEquals(3, (instant.sections[0].state as SectionState.Loaded).items.size)
+        assertTrue(instant.sections[1].state is SectionState.Loading)
+
+        repository.feed.complete(feed("Nueva", rows = 2))
+        repository.modules.getValue(0).complete(module(items = 4))
+        repository.modules.getValue(1).complete(module(items = 1))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val fresh = viewModel.uiState.value
+        assertEquals("Nueva", fresh.title)
+        assertFalse(fresh.isRefreshing)
+        assertEquals(listOf(4, 1), fresh.sections.map { (it.state as SectionState.Loaded).items.size })
+    }
+
+    @Test
+    fun `offline with a cached copy keeps it and marks it stale instead of failing`() = runTest(dispatcher) {
+        repository.cachedFeed = feed("Antigua", rows = 1)
+        repository.cachedModules[0] = module(items = 2)
+        val viewModel = PortadaViewModel(repository, URL)
+        dispatcher.scheduler.runCurrent()
+
+        repository.feed.completeExceptionally(IOException("offline"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.error)
+        assertTrue(state.isStale)
+        assertEquals(2, (state.sections.single().state as SectionState.Loaded).items.size)
     }
 
     @Test
@@ -136,8 +179,14 @@ class PortadaViewModelTest {
         var feed = CompletableDeferred<CatalogLoad<HomeFeed>>()
         val modules = (0 until 3).associateWith { CompletableDeferred<CatalogLoad<CatalogModule>>() }
 
-        override suspend fun loadPortada(url: String, forceRefresh: Boolean) = feed.await()
-        override suspend fun loadModule(row: HomeRow, forceRefresh: Boolean) = modules.getValue(row.id).await()
+        var cachedFeed: CatalogLoad<HomeFeed>? = null
+        val cachedModules = mutableMapOf<Int, CatalogLoad<CatalogModule>>()
+
+        override suspend fun loadPortada(url: String, forceRefresh: Boolean, cachedOnly: Boolean): CatalogLoad<HomeFeed> =
+            if (cachedOnly) cachedFeed ?: throw NotCachedException() else feed.await()
+
+        override suspend fun loadModule(row: HomeRow, forceRefresh: Boolean, cachedOnly: Boolean): CatalogLoad<CatalogModule> =
+            if (cachedOnly) cachedModules[row.id] ?: throw NotCachedException() else modules.getValue(row.id).await()
         override suspend fun loadExplore(forceRefresh: Boolean): CatalogLoad<List<ExploreGroup>> = throw UnsupportedOperationException()
         override suspend fun loadQuickFilters(): CatalogLoad<List<QuickFilter>> = throw UnsupportedOperationException()
         override suspend fun loadQuickFilterItems(filter: QuickFilter): CatalogLoad<CatalogModule> = throw UnsupportedOperationException()
