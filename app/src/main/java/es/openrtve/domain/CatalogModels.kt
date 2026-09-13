@@ -82,6 +82,8 @@ data class CatalogItem(
     val seasonTitle: String? = null,
     /** Solo en directos: emisión en curso o programada. */
     val live: LiveInfo? = null,
+    /** Página web del item en rtve.es; sirve para compartir y para casar enlaces. */
+    val webUrl: String? = null,
 ) {
     val needsAccount: Boolean get() = loginRequired || paid || drm
 }

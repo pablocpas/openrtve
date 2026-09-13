@@ -44,10 +44,39 @@
         <activity
             android:name=".ui.mobile.MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:screenOrientation="userPortrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Enlaces de RTVE Play: play.rtve.es/pr|v|d/{id} y las URL web de rtve.es/play/... -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="play.rtve.es" />
+                <data android:pathPrefix="/pr/" />
+                <data android:pathPrefix="/v/" />
+                <data android:pathPrefix="/d/" />
+                <data android:pathPrefix="/content" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="www.rtve.es" />
+                <data android:host="rtve.es" />
+                <data android:pathPrefix="/play/videos/" />
+                <data android:pathPrefix="/play/audios/" />
+            </intent-filter>
+            <!-- "Compartir con OpenRTVE" desde el navegador o cualquier app: no depende de verificar el dominio. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
 

@@ -88,6 +88,16 @@ recarga al volver a primer plano si tiene más de dos minutos y, mientras está
 visible, las filas de directos se recargan cada minuto (con ETag, un 304 si no
 hay cambios).
 
+## Enlaces
+
+`parseDeepLink` es una función pura sobre la URL (formatos del manifiesto de
+RTVE Play y URLs web; `content?uri=` se decodifica una sola vez) y
+`DeepLinkResolver` la convierte en un item con la red necesaria: `videos/{id}`,
+`audios/{id}`, `programas/{id}`, `lives/{idAsset}`; un permalink de programa se
+casa contra el `htmlUrl` de los resultados del buscador y uno de directo contra
+el feed de "Ahora en emisión". `MainActivity` (`singleTask`) recibe `VIEW` y
+`SEND`; el segundo es el que no depende de la verificación de dominio.
+
 ## Reproductor
 
 `PlayerView` de Media3 con un layout de controles propio

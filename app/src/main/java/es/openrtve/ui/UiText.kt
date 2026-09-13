@@ -44,6 +44,7 @@ fun UiMessage.text(context: Context): String = when (this) {
     is UiMessage.Blocked -> reason.text(context)
     is UiMessage.Text -> text
     is UiMessage.StartsAt -> context.getString(R.string.blocked_starts_at, schedule)
+    UiMessage.LinkNotFound -> context.getString(R.string.deeplink_not_found)
 }
 
 /** "Temporada 1 · E3 · 12/09/2026 · 52 min", omitiendo lo que falte. */

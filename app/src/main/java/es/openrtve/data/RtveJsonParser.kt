@@ -278,6 +278,7 @@ class RtveJsonParser(
             episode = media.number("episode")?.takeIf { it > 0 },
             seasonTitle = media.text("temporada", "temporadaShortTitle"),
             live = live,
+            webUrl = (item.text("htmlUrl") ?: media.text("htmlUrl"))?.let(hostPolicy::sanitize),
         )
     }
 

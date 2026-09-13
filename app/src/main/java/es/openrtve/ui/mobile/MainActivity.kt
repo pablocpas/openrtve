@@ -13,8 +13,26 @@ import androidx.activity.enableEdgeToEdge
 import es.openrtve.OpenRtveApplication
 import es.openrtve.ui.theme.OpenRtveTheme
 import es.openrtve.ui.tv.TvActivity
+import androidx.compose.runtime.mutableStateOf
+
+private val URL_PATTERN = Regex("""https?://[^\s<>"]+""")
 
 class MainActivity : ComponentActivity() {
+    /** Enlace recibido por VIEW o por SEND; la UI lo consume y lo pone a null. */
+    private val pendingLink = mutableStateOf<String?>(null)
+
+    private fun linkFrom(intent: Intent?): String? = when (intent?.action) {
+        Intent.ACTION_VIEW -> intent.dataString
+        Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
+            ?.let { text -> URL_PATTERN.find(text)?.value }
+        else -> null
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        linkFrom(intent)?.let { pendingLink.value = it }
+    }
+
     private fun isTelevision(): Boolean {
         val uiMode = (getSystemService(UI_MODE_SERVICE) as UiModeManager).currentModeType
         return uiMode == Configuration.UI_MODE_TYPE_TELEVISION ||
@@ -35,9 +53,14 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         val container = (application as OpenRtveApplication).container
+        if (savedInstanceState == null) linkFrom(intent)?.let { pendingLink.value = it }
         setContent {
             OpenRtveTheme {
-                MobileApp(container)
+                MobileApp(
+                    container = container,
+                    pendingLink = pendingLink.value,
+                    onLinkConsumed = { pendingLink.value = null },
+                )
             }
         }
     }

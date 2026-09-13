@@ -27,6 +27,7 @@ sealed interface UiMessage {
     data class Text(val text: String) : UiMessage
     /** Directo programado: "Empieza hoy · 16:10". */
     data class StartsAt(val schedule: String) : UiMessage
+    data object LinkNotFound : UiMessage
 }
 
 data class NavigationState(

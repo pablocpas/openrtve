@@ -116,6 +116,7 @@
     <string name="player_brightness">Brillo %1$d%%</string>
     <string name="player_volume">Volumen %1$d%%</string>
 
+    <string name="deeplink_not_found">No se ha podido abrir este enlace de RTVE</string>
     <string name="player_error_connect">No se pudo iniciar el reproductor</string>
     <string name="player_error_nothing">No hay nada en reproducción</string>
     <string name="player_error_geo">Este contenido no está disponible en tu ubicación</string>

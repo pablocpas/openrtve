@@ -29,6 +29,9 @@ de la Corporación de Radio y Televisión Española.
   toque para saltar, deslizar para brillo y volumen), indicador de directo
   con ventana DVR, MediaSession y audio en segundo plano para radio y pódcasts.
 - **DASH, HLS y MP3**, con Widevine para el contenido protegido.
+- **Enlaces de RTVE**: `play.rtve.es/pr|v|d/{id}` y las URL web de
+  `rtve.es/play/...` abren la ficha o el directo; también desde
+  "Compartir → OpenRTVE" en cualquier app.
 - **Ajustes**: imagen en imagen, audio en segundo plano, calidad máxima,
   reproducción automática, subtítulos por defecto y borrado de caché.
 - Caché con revalidación por ETag, una sola conexión HTTP/2 para catálogo e
@@ -68,6 +71,11 @@ canales, categorías ni filtros.
 Descarga el APK de la sección *Releases* e instálalo en el móvil o en la TV
 (en Android TV, por ejemplo con *Downloader* o `adb install`). La app detecta si
 está en una TV y abre la interfaz de TV aunque el launcher lance la de móvil.
+
+Enlaces: en Android 12 o superior, abrir un enlace `rtve.es` directamente en
+OpenRTVE requiere activarlo en *Ajustes → Aplicaciones → OpenRTVE → Abrir por
+defecto* (RTVE no publica la verificación de dominio para terceros). La vía
+"Compartir → OpenRTVE" funciona siempre.
 
 ## Compilar
 

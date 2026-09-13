@@ -2,6 +2,7 @@ package es.openrtve
 
 import android.content.Context
 import es.openrtve.data.AppSettings
+import es.openrtve.data.DeepLinkResolver
 import es.openrtve.data.DefaultCatalogRepository
 import es.openrtve.data.DrmTokenClient
 import es.openrtve.data.RawDocumentCache
@@ -24,6 +25,7 @@ class AppContainer(context: Context) {
         cache = documentCache,
     )
     val settings = AppSettings(context)
+    val deepLinkResolver = DeepLinkResolver(catalogRepository)
     val watchHistory = WatchHistory(context.filesDir.resolve("watch-history.json"))
     val playbackResolver = PlaybackResolver()
     val drmTokenClient = DrmTokenClient(httpClient)

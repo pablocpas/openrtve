@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -37,18 +38,24 @@ import es.openrtve.ui.Tab
 import es.openrtve.ui.UiMessage
 import es.openrtve.ui.scheduleLabel
 import es.openrtve.ui.text
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.CompositionLocalProvider
 import es.openrtve.ui.LocalNowMillis
 import es.openrtve.ui.rememberNowMillis
 
 @Composable
-fun MobileApp(container: AppContainer) {
+fun MobileApp(
+    container: AppContainer,
+    pendingLink: String? = null,
+    onLinkConsumed: () -> Unit = {},
+) {
     val repository = container.catalogRepository
     val playbackResolver = container.playbackResolver
     val navigation: NavigationViewModel = viewModel()
     val nav by navigation.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     BackHandler(enabled = nav.canGoBack, onBack = navigation::pop)
 
@@ -77,6 +84,22 @@ fun MobileApp(container: AppContainer) {
         }
     }
     val playItem: (CatalogItem) -> Unit = { play(it, false) }
+
+    // Enlace recibido (VIEW o Compartir): se resuelve por red y se abre como cualquier item.
+    // La resolución va en el scope de la pantalla: consumir el enlace reinicia el efecto.
+    LaunchedEffect(pendingLink) {
+        val url = pendingLink ?: return@LaunchedEffect
+        onLinkConsumed()
+        scope.launch {
+            val item = runCatching { container.deepLinkResolver.resolve(url) }.getOrNull()
+            when (item?.kind) {
+                null -> navigation.show(UiMessage.LinkNotFound)
+                ContentKind.PROGRAM -> navigation.push(Destination.Program(item))
+                ContentKind.VIDEO, ContentKind.AUDIO -> navigation.push(Destination.Video(item))
+                else -> play(item, false)
+            }
+        }
+    }
     // Programas y vídeos abren su ficha; directos y audios se reproducen al momento.
     val openItem: (CatalogItem) -> Unit = { item ->
         when (item.kind) {
