@@ -5,6 +5,7 @@ import android.app.PictureInPictureParams
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -443,6 +444,12 @@ class PlayerActivity : ComponentActivity() {
 
     private fun applyPresentation() {
         val isVideo = request?.isAudioOnly == false
+        // Vídeo en horizontal (sigue al sensor entre las dos orientaciones apaisadas); audio en la orientación normal.
+        requestedOrientation = if (isVideo) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
         val insets = WindowCompat.getInsetsController(window, window.decorView)
         if (isVideo) {
             insets.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

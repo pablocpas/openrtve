@@ -364,7 +364,7 @@ class RtveJsonParser(
                 .orEmpty()
                 .mapNotNull { (it as? JsonObject)?.text("subGeneroInf", "generoInf") }
                 .distinct(),
-            director = video.text("director"),
+            director = video.text("director")?.split('|')?.map(String::trim)?.filter(String::isNotEmpty)?.joinToString(", "),
             cast = video.text("casting")?.split('|')?.map(String::trim)?.filter(String::isNotEmpty).orEmpty(),
             originalLanguage = video.text("languageOriginal"),
             expirationDate = video.text("expirationDate"),
