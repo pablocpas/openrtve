@@ -196,12 +196,14 @@ internal fun ItemCard(
             (progress ?: liveProgress)?.let { ProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
         }
         Spacer(Modifier.height(6.dp))
+        // Altura fija: línea de directo/horario (solo en directos), dos de título y una de subtítulo.
         when {
             live == null -> Unit
             live.isUpcomingAt(now) -> Text(
                 text = listOfNotNull(live.scheduleLabel(context, now), live.category).joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                minLines = 1,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -211,20 +213,18 @@ internal fun ItemCard(
             text = item.title,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
+            minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        if (live == null || !live.isUpcomingAt(now)) {
-            item.subtitle?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        Text(
+            text = if (live == null || !live.isUpcomingAt(now)) item.subtitle.orEmpty() else "",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            minLines = 1,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         Spacer(Modifier.height(4.dp))
     }
 }
@@ -234,7 +234,7 @@ internal fun ItemCard(
 internal fun PosterCard(item: CatalogItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier.clip(CardShape).clickable(onClick = onClick)) {
         Artwork(item.posterUrl ?: item.imageUrl, 2f / 3f, Modifier.fillMaxWidth())
-        CardCaption(item.title, subtitle = null)
+        CardCaption(item.title, subtitle = null, subtitleLine = false)
     }
 }
 
@@ -247,21 +247,28 @@ internal fun SquareCard(item: CatalogItem, onClick: () -> Unit, modifier: Modifi
     }
 }
 
+/**
+ * Texto bajo la tarjeta con altura fija (dos líneas de título y una de subtítulo,
+ * estén o no): en una fila horizontal, si cada tarjeta midiera lo suyo, la fila
+ * cambiaría de altura al desplazarse y todo lo de debajo saltaría.
+ */
 @Composable
-private fun CardCaption(title: String, subtitle: String?) {
+private fun CardCaption(title: String, subtitle: String?, subtitleLine: Boolean = true) {
     Spacer(Modifier.height(6.dp))
     Text(
         text = title,
         style = MaterialTheme.typography.bodyMedium,
         fontWeight = FontWeight.Medium,
+        minLines = 2,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
     )
-    subtitle?.let {
+    if (subtitleLine) {
         Text(
-            text = it,
+            text = subtitle.orEmpty(),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            minLines = 1,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

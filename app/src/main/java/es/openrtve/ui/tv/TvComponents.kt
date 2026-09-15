@@ -229,22 +229,24 @@ internal fun TvItemCard(
             )
             else -> TvLiveDot()
         }
+        // Altura fija por tipo de tarjeta: así la fila no cambia de alto al desplazarse.
+        val titleLines = if (layout == RowLayout.POSTER) 2 else 1
         Text(
             text = item.title,
             style = MaterialTheme.typography.titleSmall,
-            maxLines = if (layout == RowLayout.POSTER) 2 else 1,
+            minLines = titleLines,
+            maxLines = titleLines,
             overflow = TextOverflow.Ellipsis,
         )
-        if (layout != RowLayout.POSTER && (live == null || !live.isUpcomingAt(now))) {
-            item.subtitle?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+        if (layout != RowLayout.POSTER) {
+            Text(
+                text = if (live == null || !live.isUpcomingAt(now)) item.subtitle.orEmpty() else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                minLines = 1,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
