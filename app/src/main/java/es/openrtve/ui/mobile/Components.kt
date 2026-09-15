@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -319,14 +320,19 @@ internal fun HeroPager(
                         .padding(16.dp),
                 ) {
                     if (item.live?.isOnAir == true) LiveDot(Modifier.padding(bottom = 4.dp))
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    // Altura fija de dos líneas: así el subtítulo no salta entre páginas de una y dos líneas.
+                    val titleStyle = MaterialTheme.typography.titleLarge
+                    val titleBlockHeight = with(LocalDensity.current) { (titleStyle.lineHeight * 2).toDp() }
+                    Box(Modifier.height(titleBlockHeight), contentAlignment = Alignment.BottomStart) {
+                        Text(
+                            text = item.title,
+                            style = titleStyle,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     item.subtitle?.let {
                         Text(
                             text = it,
@@ -342,9 +348,12 @@ internal fun HeroPager(
         if (items.size > 1) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+                // Centrados: el punto activo es más grande y, alineado arriba, hacía "temblar" la fila.
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .padding(top = 10.dp),
+                    .padding(top = 10.dp)
+                    .height(8.dp),
             ) {
                 repeat(items.size) { index ->
                     val active = index == pagerState.currentPage
