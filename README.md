@@ -86,6 +86,18 @@ Con el SDK de Android instalado:
 ./gradlew testDebugUnitTest lintDebug
 ```
 
+### Tests
+
+- `./gradlew testDebugUnitTest`: tests JVM (parser de los feeds, repositorio y
+  caché, cliente HTTPS, resolución de reproducción y de enlaces, historial y
+  ViewModels). Corren sin emulador y son los que ejecuta la CI.
+- `./gradlew connectedDebugAndroidTest`: tests de Compose de las pantallas de
+  portada, programa y búsqueda contra un repositorio falso, sin red. Necesitan
+  un emulador o dispositivo conectado (`ANDROID_SERIAL=emulator-5554` si hay
+  varios).
+
+Los fakes compartidos por ambas capas están en `app/src/sharedTest`.
+
 Sin SDK en el host, con Docker:
 
 ```bash

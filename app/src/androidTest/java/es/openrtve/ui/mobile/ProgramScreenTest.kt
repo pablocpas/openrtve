@@ -1,0 +1,105 @@
+package es.openrtve.ui.mobile
+
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.performScrollToNode
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import es.openrtve.R
+import es.openrtve.data.WatchHistory
+import es.openrtve.domain.CatalogItem
+import es.openrtve.domain.ContentKind
+import es.openrtve.domain.ProgramDetail
+import es.openrtve.domain.ProgramSeason
+import es.openrtve.testing.FakeCatalogRepository
+import es.openrtve.testing.catalogItem
+import es.openrtve.testing.loaded
+import es.openrtve.testing.page
+import es.openrtve.ui.theme.OpenRtveTheme
+import java.io.File
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class ProgramScreenTest {
+    @get:Rule
+    val compose = createComposeRule()
+
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private val historyFile = File(context.cacheDir, "test-history-${System.nanoTime()}.json")
+    private val history = WatchHistory(historyFile)
+    private val program = catalogItem("p1", kind = ContentKind.PROGRAM, title = "Telediario")
+    private val episodes = listOf(
+        catalogItem("e3", title = "Episodio 3", programId = "p1"),
+        catalogItem("e2", title = "Episodio 2", programId = "p1"),
+        catalogItem("e1", title = "Episodio 1", programId = "p1"),
+    )
+    private val repository = FakeCatalogRepository().apply {
+        this.program = { id, _ -> loaded(ProgramDetail(id, "Telediario", "<b>Noticias</b>", null, null, listOf(ProgramSeason("t1", "Temporada 1", 3)))) }
+        programVideos = { _, _, pageNumber, _, _ -> if (pageNumber == 1) page(episodes, 1, 2) else page(listOf(catalogItem("e0", title = "Episodio 0")), 2, 2) }
+    }
+    private val opened = mutableListOf<CatalogItem>()
+
+    @Test
+    fun withoutHistoryTheNewestEpisodeIsOfferedAndTheListPaginates() {
+        setContent()
+
+        compose.onNodeWithText(context.getString(R.string.program_play_episode, "Episodio 3")).assertIsDisplayed()
+        compose.onNodeWithText("Episodio 1").assertIsDisplayed()
+
+        // Al verse el final de la lista, la siguiente página se pide sola y el botón manual no hace falta.
+        compose.onNode(hasScrollAction() and hasAnyDescendant(hasText("Episodio 3"))).performScrollToNode(hasText("Episodio 0"))
+        compose.onNodeWithText("Episodio 0").assertIsDisplayed()
+        compose.onAllNodes(hasText(context.getString(R.string.program_load_more))).assertCountEquals(0)
+        assertEquals(2, repository.calls.count { it.startsWith("programVideos") })
+    }
+
+    @Test
+    fun anEpisodeInProgressIsContinuedAndAFinishedOneMarksTheNext() {
+        history.register(episodes[2])
+        history.updateProgress("e1", 120_000, 600_000)
+        setContent()
+
+        compose.onNodeWithText(context.getString(R.string.program_continue_episode, "Episodio 1")).assertIsDisplayed().performClick()
+        assertEquals(listOf("e1"), opened.map { it.id })
+
+        history.updateProgress("e1", 599_000, 600_000)
+        compose.onNodeWithText(context.getString(R.string.program_next_episode, "Episodio 2")).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.episode_watched)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.episode_next)).assertIsDisplayed()
+    }
+
+    @Test
+    fun anEmptyProgramExplainsItselfAndRetries() {
+        var attempts = 0
+        repository.programVideos = { _, _, _, _, _ -> if (attempts++ < 2) page(emptyList()) else page(episodes) }
+        setContent()
+
+        compose.onNodeWithText(context.getString(R.string.program_empty)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.action_retry)).performClick()
+        compose.onNodeWithText("Episodio 3").assertIsDisplayed()
+    }
+
+    private fun setContent() {
+        compose.setContent {
+            OpenRtveTheme {
+                ProgramScreen(
+                    repository = repository,
+                    history = history,
+                    program = program,
+                    onBack = {},
+                    onOpenItem = { opened += it },
+                    onError = {},
+                )
+            }
+        }
+    }
+}
