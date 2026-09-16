@@ -228,13 +228,8 @@ private fun ContinueWatchingRow(entries: List<WatchEntry>, onOpenItem: (CatalogI
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(start = ScreenPadding, end = 4.dp, bottom = 12.dp),
         )
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = ScreenPadding),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(entries, key = { it.item.id }) { entry ->
-                ItemCard(entry.item, { onOpenItem(entry.item) }, Modifier.width(LandscapeWidth), progress = entry.progress)
-            }
+        AnimatedHeightRow(entries, key = { it.item.id }) { entry ->
+            ItemCard(entry.item, { onOpenItem(entry.item) }, Modifier.width(LandscapeWidth), progress = entry.progress)
         }
     }
 }
@@ -298,16 +293,11 @@ private fun SectionView(
             }
             is SectionState.Loaded -> when (layout) {
                 RowLayout.HERO -> HeroPager(state.items, onOpenItem, fullBleed = fullBleedHero)
-                else -> LazyRow(
-                    contentPadding = PaddingValues(horizontal = ScreenPadding),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(state.items, key = { it.id }) { item ->
-                        when (layout) {
-                            RowLayout.POSTER -> PosterCard(item, { onOpenItem(item) }, Modifier.width(PosterWidth))
-                            RowLayout.SQUARE -> SquareCard(item, { onOpenItem(item) }, Modifier.width(SquareWidth))
-                            else -> ItemCard(item, { onOpenItem(item) }, Modifier.width(LandscapeWidth))
-                        }
+                else -> AnimatedHeightRow(state.items, key = { it.id }) { item ->
+                    when (layout) {
+                        RowLayout.POSTER -> PosterCard(item, { onOpenItem(item) }, Modifier.width(PosterWidth))
+                        RowLayout.SQUARE -> SquareCard(item, { onOpenItem(item) }, Modifier.width(SquareWidth))
+                        else -> ItemCard(item, { onOpenItem(item) }, Modifier.width(LandscapeWidth))
                     }
                 }
             }

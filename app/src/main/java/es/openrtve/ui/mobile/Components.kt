@@ -15,7 +15,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
+import es.openrtve.ui.RowHeightState
+import es.openrtve.ui.animatedRowHeight
+import es.openrtve.ui.rememberRowHeightState
+import es.openrtve.ui.rowItemHeight
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -433,6 +442,29 @@ internal fun EpisodeRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+    }
+}
+
+/** Fila horizontal de tarjetas con la altura animada (ver [RowHeightState]). */
+@Composable
+internal fun <T : Any> AnimatedHeightRow(
+    items: List<T>,
+    key: (T) -> Any,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = ScreenPadding),
+    card: @Composable (T) -> Unit,
+) {
+    val listState = rememberLazyListState()
+    val heightState = rememberRowHeightState(listState)
+    LazyRow(
+        state = listState,
+        contentPadding = contentPadding,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.animatedRowHeight(heightState),
+    ) {
+        items(items, key = key) { item ->
+            Box(Modifier.rowItemHeight(heightState, key(item))) { card(item) }
         }
     }
 }

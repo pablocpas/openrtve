@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +30,9 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import es.openrtve.ui.animatedRowHeight
+import es.openrtve.ui.rememberRowHeightState
+import es.openrtve.ui.rowItemHeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -201,15 +205,23 @@ private fun TvSection(
             }
             is SectionState.Loaded -> when (layout) {
                 RowLayout.HERO -> TvHeroRow(state.items, onOpenItem, modifier)
-                else -> LazyRow(
-                    contentPadding = TvRowPadding,
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                    modifier = modifier.focusRestorer(),
-                ) {
-                    items(state.items, key = { it.id }) { item ->
-                        TvItemCard(item, layout, { onOpenItem(item) }, Modifier.width(layout.cardWidth()))
+                else -> {
+                    // Altura animada según la tarjeta visible más alta (ver RowHeightState).
+                    val listState = rememberLazyListState()
+                    val heightState = rememberRowHeightState(listState)
+                    LazyRow(
+                        state = listState,
+                        contentPadding = TvRowPadding,
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        modifier = modifier.focusRestorer().animatedRowHeight(heightState),
+                    ) {
+                        items(state.items, key = { it.id }) { item ->
+                            Box(Modifier.rowItemHeight(heightState, item.id)) {
+                                TvItemCard(item, layout, { onOpenItem(item) }, Modifier.width(layout.cardWidth()))
+                            }
+                        }
+                        item(key = "see-all") { TvSeeAllCard(layout, onSeeAll) }
                     }
-                    item(key = "see-all") { TvSeeAllCard(layout, onSeeAll) }
                 }
             }
         }
