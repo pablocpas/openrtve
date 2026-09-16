@@ -47,7 +47,6 @@ import coil3.compose.AsyncImage
 import es.openrtve.R
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.ContentKind
-import es.openrtve.ui.CaptionSpec
 import es.openrtve.ui.metaLine
 import androidx.compose.ui.text.TextStyle
 import es.openrtve.ui.scheduleLabel
@@ -187,7 +186,6 @@ internal fun ItemCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     progress: Float? = null,
-    caption: CaptionSpec = CaptionSpec.Single,
 ) {
     val live = item.live
     val now = LocalNowMillis.current
@@ -199,14 +197,12 @@ internal fun ItemCard(
             (progress ?: liveProgress)?.let { ProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
         }
         Spacer(Modifier.height(6.dp))
-        // Altura fija: línea de directo/horario (solo en directos), dos de título y una de subtítulo.
         when {
             live == null -> Unit
             live.isUpcomingAt(now) -> Text(
                 text = listOfNotNull(live.scheduleLabel(context, now), live.category).joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                minLines = 1,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -215,19 +211,19 @@ internal fun ItemCard(
         Text(
             text = item.title,
             style = CardTitleStyle,
-            minLines = caption.titleLines,
-            maxLines = caption.titleLines,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        if (caption.subtitleLine) {
-            Text(
-                text = if (live == null || !live.isUpcomingAt(now)) item.subtitle.orEmpty() else "",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                minLines = 1,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        if (live == null || !live.isUpcomingAt(now)) {
+            item.subtitle?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         Spacer(Modifier.height(4.dp))
     }
@@ -235,56 +231,45 @@ internal fun ItemCard(
 
 /** Póster vertical 2:3 (series, cine). */
 @Composable
-internal fun PosterCard(
-    item: CatalogItem,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    caption: CaptionSpec = CaptionSpec(titleLines = 1, subtitleLine = false),
-) {
+internal fun PosterCard(item: CatalogItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier.clip(CardShape).clickable(onClick = onClick)) {
         Artwork(item.posterUrl ?: item.imageUrl, 2f / 3f, Modifier.fillMaxWidth())
-        CardCaption(item.title, subtitle = null, caption = caption.copy(subtitleLine = false))
+        CardCaption(item.title, subtitle = null)
     }
 }
 
 /** Tarjeta cuadrada (radio, música). */
 @Composable
-internal fun SquareCard(
-    item: CatalogItem,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    caption: CaptionSpec = CaptionSpec.Single,
-) {
+internal fun SquareCard(item: CatalogItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier.clip(CardShape).clickable(onClick = onClick)) {
         Artwork(item.squareUrl ?: item.imageUrl ?: item.posterUrl, 1f, Modifier.fillMaxWidth(), overlay = item.liveOverlay())
-        CardCaption(item.title, item.subtitle, caption)
+        CardCaption(item.title, item.subtitle)
     }
 }
 
-/** Estilo del título de tarjeta; `rememberCaptionSpec` mide con él. */
+/** Estilo del título de tarjeta. */
 internal val CardTitleStyle: TextStyle
     @Composable get() = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
 
 /**
- * Texto bajo la tarjeta. [caption] fija cuántas líneas se reservan para toda la
- * fila (medidas con sus items), para que la fila no cambie de altura al desplazarse.
+ * Texto bajo la tarjeta, con la altura que necesite (como en Findroid). Si la
+ * fila cambia de alto al desplazarse, `animateItem()` en la portada suaviza el
+ * desplazamiento de lo que hay debajo.
  */
 @Composable
-private fun CardCaption(title: String, subtitle: String?, caption: CaptionSpec) {
+private fun CardCaption(title: String, subtitle: String?) {
     Spacer(Modifier.height(6.dp))
     Text(
         text = title,
         style = CardTitleStyle,
-        minLines = caption.titleLines,
-        maxLines = caption.titleLines,
+        maxLines = 2,
         overflow = TextOverflow.Ellipsis,
     )
-    if (caption.subtitleLine) {
+    subtitle?.let {
         Text(
-            text = subtitle.orEmpty(),
+            text = it,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-            minLines = 1,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

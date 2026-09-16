@@ -10,7 +10,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlaySuggestionTest {
-    private val history = WatchHistory(Files.createTempDirectory("openrtve").resolve("h.json").toFile())
+    // Reloj propio: con el real, dos episodios vistos en el mismo milisegundo empatan como "último visto".
+    private var now = 1_000L
+    private val history = WatchHistory(Files.createTempDirectory("openrtve").resolve("h.json").toFile(), nowMillis = { now++ })
     // Del más nuevo al más antiguo, como los feeds de RTVE.
     private val episodes = listOf(episode("904"), episode("903"), episode("902"))
 

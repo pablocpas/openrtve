@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.platform.LocalContext
-import es.openrtve.ui.CaptionSpec
 import es.openrtve.ui.LocalNowMillis
 import androidx.compose.ui.text.TextStyle
 import es.openrtve.ui.scheduleLabel
@@ -199,8 +198,6 @@ internal fun TvLiveBadge(modifier: Modifier = Modifier) {
 internal val TvCardTitleStyle: TextStyle
     @Composable get() = MaterialTheme.typography.titleSmall
 
-internal fun RowLayout.maxTitleLines(): Int = if (this == RowLayout.POSTER) 2 else 1
-
 @Composable
 internal fun TvItemCard(
     item: CatalogItem,
@@ -208,7 +205,6 @@ internal fun TvItemCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     progress: Float? = null,
-    caption: CaptionSpec = CaptionSpec(titleLines = 1, subtitleLine = layout != RowLayout.POSTER),
 ) {
     val image = when (layout) {
         RowLayout.POSTER -> item.posterUrl ?: item.imageUrl
@@ -237,23 +233,22 @@ internal fun TvItemCard(
             )
             else -> TvLiveDot()
         }
-        // Líneas reservadas para toda la fila (medidas con sus items): altura constante sin sobrar.
         Text(
             text = item.title,
             style = TvCardTitleStyle,
-            minLines = caption.titleLines,
-            maxLines = caption.titleLines,
+            maxLines = if (layout == RowLayout.POSTER) 2 else 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (caption.subtitleLine && layout != RowLayout.POSTER) {
-            Text(
-                text = if (live == null || !live.isUpcomingAt(now)) item.subtitle.orEmpty() else "",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                minLines = 1,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        if (layout != RowLayout.POSTER && (live == null || !live.isUpcomingAt(now))) {
+            item.subtitle?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

@@ -25,7 +25,6 @@ import es.openrtve.domain.HomeRow
 import es.openrtve.domain.RowLayout
 import es.openrtve.ui.ModuleViewModel
 import es.openrtve.ui.text
-import es.openrtve.ui.rememberCaptionSpec
 
 @Composable
 fun TvModuleScreen(
@@ -64,7 +63,6 @@ fun TvModuleScreen(
 internal fun TvItemGrid(items: List<CatalogItem>, layout: RowLayout, onOpenItem: (CatalogItem) -> Unit) {
     // En rejilla el hero no tiene sentido: se degrada a apaisada.
     val gridLayout = if (layout == RowLayout.HERO) RowLayout.LANDSCAPE else layout
-    val caption = rememberCaptionSpec(items, gridLayout.cardWidth(), TvCardTitleStyle, gridLayout.maxTitleLines())
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = gridLayout.cardWidth()),
         contentPadding = PaddingValues(start = TvHorizontalMargin, end = TvHorizontalMargin, bottom = TvVerticalMargin),
@@ -73,7 +71,7 @@ internal fun TvItemGrid(items: List<CatalogItem>, layout: RowLayout, onOpenItem:
         modifier = Modifier.fillMaxSize(),
     ) {
         itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
-            TvItemCard(item, gridLayout, { onOpenItem(item) }, if (index == 0) Modifier.initialFocus() else Modifier, caption = caption)
+            TvItemCard(item, gridLayout, { onOpenItem(item) }, if (index == 0) Modifier.initialFocus() else Modifier)
         }
     }
 }

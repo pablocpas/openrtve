@@ -69,7 +69,6 @@ import es.openrtve.ui.HomeSection
 import es.openrtve.ui.PortadaViewModel
 import es.openrtve.ui.SectionState
 import es.openrtve.ui.text
-import es.openrtve.ui.rememberCaptionSpec
 
 /**
  * Portada al estilo Findroid: lista vertical de secciones, cada una con su propio
@@ -154,7 +153,7 @@ fun PortadaScreen(
                     }
                     val heroFirst = startsWithHero && state.sections.first().state !is SectionState.Failed
                     if (resumable.isNotEmpty() && !heroFirst) {
-                        item(key = "continue") { ContinueWatchingRow(resumable, onOpenItem) }
+                        item(key = "continue") { ContinueWatchingRow(resumable, onOpenItem, Modifier.animateItem()) }
                     }
                     items(state.sections, key = { it.row.id }) { section ->
                         SectionView(
@@ -163,6 +162,8 @@ fun PortadaScreen(
                             onOpenItem = onOpenItem,
                             onSeeAll = { onOpenRow(section.row, section.title) },
                             onRetry = { viewModel.retrySection(section.row) },
+                            // Como en Findroid: si una fila cambia de alto, las de debajo se desplazan animadas.
+                            modifier = Modifier.animateItem(),
                         )
                         // Tras el hero, como en la app oficial y en Findroid.
                         if (heroFirst && resumable.isNotEmpty() && section.row.id == state.sections.first().row.id) {
@@ -219,9 +220,8 @@ private fun FloatingBrandBar(onOpenSettings: (() -> Unit)?) {
 }
 
 @Composable
-private fun ContinueWatchingRow(entries: List<WatchEntry>, onOpenItem: (CatalogItem) -> Unit) {
-    val caption = rememberCaptionSpec(entries.map { it.item }, LandscapeWidth, CardTitleStyle)
-    Column {
+private fun ContinueWatchingRow(entries: List<WatchEntry>, onOpenItem: (CatalogItem) -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier) {
         Text(
             text = stringResource(R.string.continue_watching),
             style = MaterialTheme.typography.titleMedium,
@@ -233,7 +233,7 @@ private fun ContinueWatchingRow(entries: List<WatchEntry>, onOpenItem: (CatalogI
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(entries, key = { it.item.id }) { entry ->
-                ItemCard(entry.item, { onOpenItem(entry.item) }, Modifier.width(LandscapeWidth), progress = entry.progress, caption = caption)
+                ItemCard(entry.item, { onOpenItem(entry.item) }, Modifier.width(LandscapeWidth), progress = entry.progress)
             }
         }
     }
@@ -256,10 +256,11 @@ private fun SectionView(
     onOpenItem: (CatalogItem) -> Unit,
     onSeeAll: () -> Unit,
     onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val layout = section.row.layout
-    Column {
+    Column(modifier) {
         // El hero no lleva cabecera: la imagen y el título ya son la cabecera.
         if (layout != RowLayout.HERO && section.title.isNotBlank()) {
             Row(
@@ -297,23 +298,15 @@ private fun SectionView(
             }
             is SectionState.Loaded -> when (layout) {
                 RowLayout.HERO -> HeroPager(state.items, onOpenItem, fullBleed = fullBleedHero)
-                else -> {
-                    val width = when (layout) {
-                        RowLayout.POSTER -> PosterWidth
-                        RowLayout.SQUARE -> SquareWidth
-                        else -> LandscapeWidth
-                    }
-                    val caption = rememberCaptionSpec(state.items, width, CardTitleStyle)
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = ScreenPadding),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(state.items, key = { it.id }) { item ->
-                            when (layout) {
-                                RowLayout.POSTER -> PosterCard(item, { onOpenItem(item) }, Modifier.width(width), caption)
-                                RowLayout.SQUARE -> SquareCard(item, { onOpenItem(item) }, Modifier.width(width), caption)
-                                else -> ItemCard(item, { onOpenItem(item) }, Modifier.width(width), caption = caption)
-                            }
+                else -> LazyRow(
+                    contentPadding = PaddingValues(horizontal = ScreenPadding),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(state.items, key = { it.id }) { item ->
+                        when (layout) {
+                            RowLayout.POSTER -> PosterCard(item, { onOpenItem(item) }, Modifier.width(PosterWidth))
+                            RowLayout.SQUARE -> SquareCard(item, { onOpenItem(item) }, Modifier.width(SquareWidth))
+                            else -> ItemCard(item, { onOpenItem(item) }, Modifier.width(LandscapeWidth))
                         }
                     }
                 }
