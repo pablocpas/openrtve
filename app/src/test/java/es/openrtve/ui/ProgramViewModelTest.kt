@@ -1,0 +1,187 @@
+package es.openrtve.ui
+
+import es.openrtve.domain.ProgramDetail
+import es.openrtve.domain.ProgramSeason
+import es.openrtve.testing.FakeCatalogRepository
+import es.openrtve.testing.MainDispatcherRule
+import es.openrtve.testing.catalogItem
+import es.openrtve.testing.loaded
+import es.openrtve.testing.page
+import java.io.IOException
+import java.net.SocketTimeoutException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class ProgramViewModelTest {
+    @get:Rule
+    val mainDispatcher = MainDispatcherRule()
+
+    private val repository = FakeCatalogRepository().apply {
+        program = { id, _ -> loaded(detail(id)) }
+        programVideos = { _, _, pageNumber, _, _ -> page(listOf(catalogItem("e$pageNumber")), page = pageNumber, totalPages = 2) }
+    }
+
+    @Test
+    fun `detail arrives first and the first page of complete episodes follows`() = runTest(mainDispatcher.dispatcher) {
+        val viewModel = ProgramViewModel(repository, "135930", "Telediario (inicial)")
+        assertTrue(viewModel.uiState.value.isLoading)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("Telediario", state.title)
+        assertEquals(listOf("e1"), state.episodes.map { it.id })
+        assertEquals(1, state.page)
+        assertTrue(state.hasMore)
+        assertFalse(state.isLoading)
+        assertFalse(state.showingClips)
+        assertEquals(listOf("program(135930, force=false)", "programVideos(135930, season=null, page=1, complete=true)"), repository.calls)
+    }
+
+    @Test
+    fun `load more appends the next page and ignores duplicates and double taps`() = runTest(mainDispatcher.dispatcher) {
+        val secondPage = CompletableDeferred<Unit>()
+        repository.programVideos = { _, _, pageNumber, _, _ ->
+            if (pageNumber == 2) secondPage.await()
+            page(listOf(catalogItem("e$pageNumber"), catalogItem("shared")), page = pageNumber, totalPages = 2)
+        }
+        val viewModel = ProgramViewModel(repository, "1", "")
+        advanceUntilIdle()
+
+        viewModel.loadMore()
+        runCurrent()
+        assertTrue(viewModel.uiState.value.isLoadingMore)
+        viewModel.loadMore()
+        runCurrent()
+        secondPage.complete(Unit)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(listOf("e1", "shared", "e2"), state.episodes.map { it.id })
+        assertFalse(state.hasMore)
+        assertEquals(1, repository.calls.count { "page=2" in it })
+
+        viewModel.loadMore()
+        advanceUntilIdle()
+        assertEquals("sin más páginas no se pide nada", 1, repository.calls.count { "page=2" in it })
+    }
+
+    @Test
+    fun `programs without complete episodes fall back to clips`() = runTest(mainDispatcher.dispatcher) {
+        repository.programVideos = { _, _, _, completeOnly, _ ->
+            if (completeOnly) page(emptyList()) else page(listOf(catalogItem("clip")))
+        }
+        val viewModel = ProgramViewModel(repository, "1", "")
+        advanceUntilIdle()
+
+        assertEquals(listOf("clip"), viewModel.uiState.value.episodes.map { it.id })
+        assertTrue(viewModel.uiState.value.showingClips)
+    }
+
+    @Test
+    fun `radio programs read audios and fall back to videos when they publish videopodcasts`() = runTest(mainDispatcher.dispatcher) {
+        repository.program = { id, _ -> loaded(detail(id).copy(isRadio = true)) }
+        repository.programAudios = { _, _, _ -> page(listOf(catalogItem("a1"))) }
+        val viewModel = ProgramViewModel(repository, "radio", "")
+        advanceUntilIdle()
+        assertEquals(listOf("a1"), viewModel.uiState.value.episodes.map { it.id })
+        assertTrue(repository.calls.none { it.startsWith("programVideos") })
+
+        repository.programAudios = { _, _, _ -> page(emptyList()) }
+        repository.programVideos = { _, _, pageNumber, _, _ -> page(listOf(catalogItem("vp$pageNumber")), page = pageNumber, totalPages = 2) }
+        val videopodcast = ProgramViewModel(repository, "radio2", "")
+        advanceUntilIdle()
+        assertEquals(listOf("vp1"), videopodcast.uiState.value.episodes.map { it.id })
+        assertFalse(videopodcast.uiState.value.showingClips)
+
+        videopodcast.loadMore()
+        advanceUntilIdle()
+        assertEquals("la segunda página sale de la misma fuente que la primera", listOf("vp1", "vp2"), videopodcast.uiState.value.episodes.map { it.id })
+        assertEquals(listOf("programAudios(radio2, page=1)"), repository.calls.filter { it.startsWith("programAudios(radio2") })
+    }
+
+    @Test
+    fun `selecting a season restarts the list and the same season is a no-op`() = runTest(mainDispatcher.dispatcher) {
+        val viewModel = ProgramViewModel(repository, "1", "")
+        advanceUntilIdle()
+        viewModel.loadMore()
+        advanceUntilIdle()
+        assertEquals(2, viewModel.uiState.value.episodes.size)
+
+        viewModel.selectSeason("t2")
+        assertTrue(viewModel.uiState.value.episodes.isEmpty())
+        advanceUntilIdle()
+        assertEquals(listOf("e1"), viewModel.uiState.value.episodes.map { it.id })
+        assertTrue(repository.calls.last().contains("season=t2, page=1"))
+
+        val before = repository.calls.size
+        viewModel.selectSeason("t2")
+        advanceUntilIdle()
+        assertEquals(before, repository.calls.size)
+    }
+
+    @Test
+    fun `a missing sheet does not prevent the episodes from loading`() = runTest(mainDispatcher.dispatcher) {
+        repository.program = { _, _ -> throw IOException("404") }
+        val viewModel = ProgramViewModel(repository, "1", "Título de la fila")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNull(state.detail)
+        assertEquals("Título de la fila", state.title)
+        assertEquals(listOf("e1"), state.episodes.map { it.id })
+        assertNull(state.error)
+    }
+
+    @Test
+    fun `episode errors are reported and retry reloads the right page`() = runTest(mainDispatcher.dispatcher) {
+        repository.programVideos = { _, _, _, _, _ -> throw SocketTimeoutException() }
+        val viewModel = ProgramViewModel(repository, "1", "")
+        advanceUntilIdle()
+        assertEquals(LoadError.Timeout, viewModel.uiState.value.error)
+        assertFalse(viewModel.uiState.value.isLoading)
+
+        repository.programVideos = { _, _, pageNumber, _, _ -> page(listOf(catalogItem("e$pageNumber")), page = pageNumber, totalPages = 2) }
+        viewModel.retry()
+        advanceUntilIdle()
+        assertNull(viewModel.uiState.value.error)
+        assertEquals(listOf("e1"), viewModel.uiState.value.episodes.map { it.id })
+
+        repository.programVideos = { _, _, _, _, _ -> throw IOException() }
+        viewModel.loadMore()
+        advanceUntilIdle()
+        assertEquals(LoadError.Unknown, viewModel.uiState.value.error)
+        assertFalse(viewModel.uiState.value.isLoadingMore)
+
+        repository.programVideos = { _, _, pageNumber, _, _ -> page(listOf(catalogItem("e$pageNumber")), page = pageNumber, totalPages = 2) }
+        viewModel.retry()
+        advanceUntilIdle()
+        assertEquals("con episodios, reintentar pide la siguiente página", listOf("e1", "e2"), viewModel.uiState.value.episodes.map { it.id })
+    }
+
+    @Test
+    fun `stale data from either source marks the screen as stale`() = runTest(mainDispatcher.dispatcher) {
+        repository.programVideos = { _, _, _, _, _ -> page(listOf(catalogItem("e1")), isStale = true) }
+        val viewModel = ProgramViewModel(repository, "1", "")
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isStale)
+    }
+
+    private fun detail(id: String) = ProgramDetail(
+        id = id,
+        title = "Telediario",
+        description = null,
+        imageUrl = null,
+        emission = null,
+        seasons = listOf(ProgramSeason("t1", "Temporada 1", 10)),
+    )
+}

@@ -33,7 +33,6 @@
     <string name="explore_radio">Radio y pódcasts</string>
 
     <string name="action_back">Atrás</string>
-    <string name="action_refresh">Actualizar</string>
     <string name="action_retry">Reintentar</string>
     <string name="action_see_all">Ver todo</string>
 
@@ -81,7 +80,6 @@
     <string name="video_cast">Reparto</string>
     <string name="video_language">Idioma original</string>
     <string name="video_available_until">Disponible hasta</string>
-    <string name="video_program">Programa</string>
     <string name="meta_episode">E%1$d</string>
     <string name="meta_minutes">%1$d min</string>
 

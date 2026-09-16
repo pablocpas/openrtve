@@ -1,0 +1,63 @@
+package es.openrtve.ui
+
+import es.openrtve.domain.BlockReason
+import es.openrtve.testing.catalogItem
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class NavigationViewModelTest {
+    private val viewModel = NavigationViewModel()
+    private val state get() = viewModel.state.value
+
+    @Test
+    fun `each tab keeps its own stack`() {
+        val program = Destination.Program(catalogItem("p"))
+        viewModel.push(program)
+        viewModel.selectTab(Tab.SEARCH)
+        viewModel.push(Destination.Settings)
+
+        assertEquals(listOf(Destination.Settings), state.stack)
+        viewModel.selectTab(Tab.HOME)
+        assertEquals(listOf(program), state.stack)
+        assertEquals(program, state.current)
+        assertTrue(state.canGoBack)
+    }
+
+    @Test
+    fun `pop removes the top and is harmless on an empty stack`() {
+        viewModel.push(Destination.Settings)
+        viewModel.push(Destination.Video(catalogItem("v")))
+        viewModel.pop()
+        assertEquals(listOf(Destination.Settings), state.stack)
+        viewModel.pop()
+        viewModel.pop()
+        assertTrue(state.stack.isEmpty())
+        assertFalse(state.canGoBack)
+        assertNull(state.current)
+    }
+
+    @Test
+    fun `reselecting the active tab returns to its root and other tabs keep their stacks`() {
+        viewModel.push(Destination.Settings)
+        viewModel.selectTab(Tab.EXPLORE)
+        viewModel.push(Destination.Portada("https://www.rtve.es/play/x.json", "X"))
+        viewModel.selectTab(Tab.EXPLORE)
+        assertTrue(state.stack.isEmpty())
+
+        viewModel.selectTab(Tab.HOME)
+        assertEquals(listOf(Destination.Settings), state.stack)
+    }
+
+    @Test
+    fun `messages are shown once and dismissed`() {
+        viewModel.show(UiMessage.Blocked(BlockReason.GEO_RESTRICTED))
+        assertEquals(UiMessage.Blocked(BlockReason.GEO_RESTRICTED), state.message)
+        viewModel.show(UiMessage.LinkNotFound)
+        assertEquals("el último mensaje sustituye al anterior", UiMessage.LinkNotFound, state.message)
+        viewModel.dismissMessage()
+        assertNull(state.message)
+    }
+}

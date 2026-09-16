@@ -67,8 +67,11 @@ class ProgramViewModel(
 
     private val isRadio: Boolean get() = mutableUiState.value.detail?.isRadio == true
 
-    private suspend fun loadPage(programId: String, seasonId: String?, page: Int, completeOnly: Boolean) =
-        if (isRadio) repository.loadProgramAudios(programId, page) else repository.loadProgramVideos(programId, seasonId, page, completeOnly)
+    /** De dónde salió la primera página; las siguientes van a la misma fuente aunque el programa sea de radio. */
+    private var episodesFromAudios = false
+
+    private suspend fun loadPage(programId: String, seasonId: String?, page: Int, completeOnly: Boolean, fromAudios: Boolean) =
+        if (fromAudios) repository.loadProgramAudios(programId, page) else repository.loadProgramVideos(programId, seasonId, page, completeOnly)
 
     fun selectSeason(seasonId: String?) {
         if (seasonId == mutableUiState.value.selectedSeasonId) return
@@ -82,7 +85,7 @@ class ProgramViewModel(
         episodesJob = viewModelScope.launch {
             mutableUiState.update { it.copy(isLoadingMore = true) }
             try {
-                val result = loadPage(state.programId, state.selectedSeasonId, state.page + 1, completeOnly = !state.showingClips)
+                val result = loadPage(state.programId, state.selectedSeasonId, state.page + 1, completeOnly = !state.showingClips, fromAudios = episodesFromAudios)
                 mutableUiState.update {
                     it.copy(
                         episodes = (it.episodes + result.value.items).distinctBy(CatalogItem::id),
@@ -117,7 +120,8 @@ class ProgramViewModel(
             val seasonId = mutableUiState.value.selectedSeasonId
             try {
                 var showingClips = false
-                var result = loadPage(programId, seasonId, page = 1, completeOnly = true)
+                var fromAudios = isRadio
+                var result = loadPage(programId, seasonId, page = 1, completeOnly = true, fromAudios = fromAudios)
                 if (result.value.items.isEmpty() && !isRadio) {
                     // Programas de clips (titulares, deportes...) no tienen "Completo".
                     result = repository.loadProgramVideos(programId, seasonId, page = 1, completeOnly = false)
@@ -126,7 +130,9 @@ class ProgramViewModel(
                 if (result.value.items.isEmpty() && isRadio) {
                     // Algún programa de radio publica videopódcasts en vez de audios.
                     result = repository.loadProgramVideos(programId, seasonId, page = 1, completeOnly = false)
+                    fromAudios = false
                 }
+                episodesFromAudios = fromAudios
                 mutableUiState.update {
                     it.copy(
                         episodes = result.value.items,
