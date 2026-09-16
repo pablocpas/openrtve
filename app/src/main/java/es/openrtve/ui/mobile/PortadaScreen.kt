@@ -69,6 +69,7 @@ import es.openrtve.ui.HomeSection
 import es.openrtve.ui.PortadaViewModel
 import es.openrtve.ui.SectionState
 import es.openrtve.ui.text
+import es.openrtve.ui.rememberCaptionSpec
 
 /**
  * Portada al estilo Findroid: lista vertical de secciones, cada una con su propio
@@ -219,6 +220,7 @@ private fun FloatingBrandBar(onOpenSettings: (() -> Unit)?) {
 
 @Composable
 private fun ContinueWatchingRow(entries: List<WatchEntry>, onOpenItem: (CatalogItem) -> Unit) {
+    val caption = rememberCaptionSpec(entries.map { it.item }, LandscapeWidth, CardTitleStyle)
     Column {
         Text(
             text = stringResource(R.string.continue_watching),
@@ -231,7 +233,7 @@ private fun ContinueWatchingRow(entries: List<WatchEntry>, onOpenItem: (CatalogI
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(entries, key = { it.item.id }) { entry ->
-                ItemCard(entry.item, { onOpenItem(entry.item) }, Modifier.width(LandscapeWidth), progress = entry.progress)
+                ItemCard(entry.item, { onOpenItem(entry.item) }, Modifier.width(LandscapeWidth), progress = entry.progress, caption = caption)
             }
         }
     }
@@ -295,15 +297,23 @@ private fun SectionView(
             }
             is SectionState.Loaded -> when (layout) {
                 RowLayout.HERO -> HeroPager(state.items, onOpenItem, fullBleed = fullBleedHero)
-                else -> LazyRow(
-                    contentPadding = PaddingValues(horizontal = ScreenPadding),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(state.items, key = { it.id }) { item ->
-                        when (layout) {
-                            RowLayout.POSTER -> PosterCard(item, { onOpenItem(item) }, Modifier.width(PosterWidth))
-                            RowLayout.SQUARE -> SquareCard(item, { onOpenItem(item) }, Modifier.width(SquareWidth))
-                            else -> ItemCard(item, { onOpenItem(item) }, Modifier.width(LandscapeWidth))
+                else -> {
+                    val width = when (layout) {
+                        RowLayout.POSTER -> PosterWidth
+                        RowLayout.SQUARE -> SquareWidth
+                        else -> LandscapeWidth
+                    }
+                    val caption = rememberCaptionSpec(state.items, width, CardTitleStyle)
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = ScreenPadding),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(state.items, key = { it.id }) { item ->
+                            when (layout) {
+                                RowLayout.POSTER -> PosterCard(item, { onOpenItem(item) }, Modifier.width(width), caption)
+                                RowLayout.SQUARE -> SquareCard(item, { onOpenItem(item) }, Modifier.width(width), caption)
+                                else -> ItemCard(item, { onOpenItem(item) }, Modifier.width(width), caption = caption)
+                            }
                         }
                     }
                 }

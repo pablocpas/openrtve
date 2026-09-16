@@ -27,6 +27,7 @@ import es.openrtve.domain.HomeRow
 import es.openrtve.domain.RowLayout
 import es.openrtve.ui.ModuleViewModel
 import es.openrtve.ui.text
+import es.openrtve.ui.rememberCaptionSpec
 
 /** Rejilla completa de una fila ("Ver todo"). */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,8 +77,11 @@ fun ModuleScreen(
 @Composable
 internal fun ItemGrid(items: List<CatalogItem>, layout: RowLayout, onOpenItem: (CatalogItem) -> Unit) {
     val poster = layout == RowLayout.POSTER
+    val minSize = if (poster) 110.dp else 160.dp
+    // Las celdas son al menos minSize de ancho: medir con ese ancho da el peor caso.
+    val caption = rememberCaptionSpec(items, minSize, CardTitleStyle)
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = if (poster) 110.dp else 160.dp),
+        columns = GridCells.Adaptive(minSize = minSize),
         contentPadding = PaddingValues(ScreenPadding),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -85,9 +89,9 @@ internal fun ItemGrid(items: List<CatalogItem>, layout: RowLayout, onOpenItem: (
     ) {
         items(items, key = { it.id }) { item ->
             when {
-                poster -> PosterCard(item, { onOpenItem(item) })
-                layout == RowLayout.SQUARE -> SquareCard(item, { onOpenItem(item) })
-                else -> ItemCard(item, { onOpenItem(item) })
+                poster -> PosterCard(item, { onOpenItem(item) }, caption = caption)
+                layout == RowLayout.SQUARE -> SquareCard(item, { onOpenItem(item) }, caption = caption)
+                else -> ItemCard(item, { onOpenItem(item) }, caption = caption)
             }
         }
     }

@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.platform.LocalContext
+import es.openrtve.ui.CaptionSpec
 import es.openrtve.ui.LocalNowMillis
+import androidx.compose.ui.text.TextStyle
 import es.openrtve.ui.scheduleLabel
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -194,6 +196,11 @@ internal fun TvLiveBadge(modifier: Modifier = Modifier) {
 }
 
 /** Tarjeta de contenido según la presentación de la fila. El texto va debajo, fuera de la zona que escala. */
+internal val TvCardTitleStyle: TextStyle
+    @Composable get() = MaterialTheme.typography.titleSmall
+
+internal fun RowLayout.maxTitleLines(): Int = if (this == RowLayout.POSTER) 2 else 1
+
 @Composable
 internal fun TvItemCard(
     item: CatalogItem,
@@ -201,6 +208,7 @@ internal fun TvItemCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     progress: Float? = null,
+    caption: CaptionSpec = CaptionSpec(titleLines = 1, subtitleLine = layout != RowLayout.POSTER),
 ) {
     val image = when (layout) {
         RowLayout.POSTER -> item.posterUrl ?: item.imageUrl
@@ -229,16 +237,15 @@ internal fun TvItemCard(
             )
             else -> TvLiveDot()
         }
-        // Altura fija por tipo de tarjeta: así la fila no cambia de alto al desplazarse.
-        val titleLines = if (layout == RowLayout.POSTER) 2 else 1
+        // Líneas reservadas para toda la fila (medidas con sus items): altura constante sin sobrar.
         Text(
             text = item.title,
-            style = MaterialTheme.typography.titleSmall,
-            minLines = titleLines,
-            maxLines = titleLines,
+            style = TvCardTitleStyle,
+            minLines = caption.titleLines,
+            maxLines = caption.titleLines,
             overflow = TextOverflow.Ellipsis,
         )
-        if (layout != RowLayout.POSTER) {
+        if (caption.subtitleLine && layout != RowLayout.POSTER) {
             Text(
                 text = if (live == null || !live.isUpcomingAt(now)) item.subtitle.orEmpty() else "",
                 style = MaterialTheme.typography.bodySmall,

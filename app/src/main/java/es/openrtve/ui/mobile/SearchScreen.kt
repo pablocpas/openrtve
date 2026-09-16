@@ -47,6 +47,7 @@ import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.RowLayout
 import es.openrtve.ui.SearchViewModel
 import es.openrtve.ui.text
+import es.openrtve.ui.rememberCaptionSpec
 
 /** Buscador: campo de texto, filtros rápidos de la app oficial y resultados por bloque. */
 @Composable
@@ -136,12 +137,13 @@ private fun SearchResultsView(
             if (results.programs.isNotEmpty()) {
                 item(key = "programs-header") { SectionHeader(stringResource(R.string.search_programs)) }
                 item(key = "programs") {
+                    val caption = rememberCaptionSpec(results.programs, 130.dp, CardTitleStyle)
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = ScreenPadding),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         items(results.programs, key = { it.id }) { item ->
-                            PosterCard(item, { onOpenItem(item) }, Modifier.width(130.dp))
+                            PosterCard(item, { onOpenItem(item) }, Modifier.width(130.dp), caption)
                         }
                     }
                 }

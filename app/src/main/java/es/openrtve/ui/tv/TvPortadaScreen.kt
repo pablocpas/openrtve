@@ -58,6 +58,7 @@ import es.openrtve.ui.HomeSection
 import es.openrtve.ui.PortadaViewModel
 import es.openrtve.ui.SectionState
 import es.openrtve.ui.text
+import es.openrtve.ui.rememberCaptionSpec
 
 /**
  * Portada de TV como en JetStream: carrusel destacado arriba y filas horizontales
@@ -146,6 +147,7 @@ fun TvPortadaScreen(
 
 @Composable
 private fun TvContinueWatching(entries: List<WatchEntry>, onOpenItem: (CatalogItem) -> Unit) {
+    val caption = rememberCaptionSpec(entries.map { it.item }, TvLandscapeWidth, TvCardTitleStyle, 1)
     Column {
         TvSectionTitle(stringResource(R.string.continue_watching))
         Spacer(Modifier.height(12.dp))
@@ -155,7 +157,7 @@ private fun TvContinueWatching(entries: List<WatchEntry>, onOpenItem: (CatalogIt
             modifier = Modifier.focusRestorer(),
         ) {
             items(entries, key = { it.item.id }) { entry ->
-                TvItemCard(entry.item, RowLayout.LANDSCAPE, { onOpenItem(entry.item) }, Modifier.width(TvLandscapeWidth), progress = entry.progress)
+                TvItemCard(entry.item, RowLayout.LANDSCAPE, { onOpenItem(entry.item) }, Modifier.width(TvLandscapeWidth), progress = entry.progress, caption = caption)
             }
         }
     }
@@ -200,15 +202,18 @@ private fun TvSection(
             }
             is SectionState.Loaded -> when (layout) {
                 RowLayout.HERO -> TvHeroRow(state.items, onOpenItem, modifier)
-                else -> LazyRow(
-                    contentPadding = TvRowPadding,
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                    modifier = modifier.focusRestorer(),
-                ) {
-                    items(state.items, key = { it.id }) { item ->
-                        TvItemCard(item, layout, { onOpenItem(item) }, Modifier.width(layout.cardWidth()))
+                else -> {
+                    val caption = rememberCaptionSpec(state.items, layout.cardWidth(), TvCardTitleStyle, layout.maxTitleLines())
+                    LazyRow(
+                        contentPadding = TvRowPadding,
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        modifier = modifier.focusRestorer(),
+                    ) {
+                        items(state.items, key = { it.id }) { item ->
+                            TvItemCard(item, layout, { onOpenItem(item) }, Modifier.width(layout.cardWidth()), caption = caption)
+                        }
+                        item(key = "see-all") { TvSeeAllCard(layout, onSeeAll) }
                     }
-                    item(key = "see-all") { TvSeeAllCard(layout, onSeeAll) }
                 }
             }
         }
