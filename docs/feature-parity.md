@@ -19,6 +19,7 @@ debe ofrecer un cliente alternativo de primera clase.
 | Capacidad | Evidencia | Criterio de aceptación |
 |---|---|---|
 | Configuración remota | S/H | Arranca online y offline con última configuración válida; una sección inválida no bloquea el resto |
+| Menú de categorías | S/H | Explorar enseña las portadas públicas (`tipo: portada`) de `menuBloques`, incluidas las de los `submenu` (temáticas, canales, emisoras), sin lista compilada |
 | Portada TV dinámica | S/H | Interpreta colección, directos, catálogos, historias y módulos desconocidos sin crash |
 | Portada y catálogo de radio | S/H | Radio es una sección de primer nivel aunque la app analizada la tenga desconectada |
 | Colecciones | S/H | Abre colección, pagina y navega programa/VOD/audio según el tipo real |
@@ -183,6 +184,72 @@ son objetivos del nuevo producto, no métricas extraídas de RTVE Play.
 8. DRM y descargas autorizadas.
 9. Cast, territoriales, anuncios y superficies secundarias.
 10. Android TV y endurecimiento final.
+
+## Configuración por formato
+
+La app móvil (`rtve.tablet.android`) lee `estructura2.json`; la de Android TV
+(`com.rtve.androidtv` 8.1.9) lee `estructuraAndroidTV2.json`, solo con el árbol
+`television`: menú distinto (añade `portada4k`, Cuéntame y Arxiu Catalunya;
+no trae canales temáticos, territoriales ni Participa), parrilla con Catalunya
+y Canarias y otro conjunto de `canalestematicos`. OpenRTVE usa hoy
+`estructura2.json` en ambos formatos.
+
+El árbol `radio` solo existe en `estructura2.json` y RTVE Play no lo pinta en
+ninguna versión: el catálogo de audio vive en la app RTVE Audio
+(`es.rtve.playradio`), y el menú de Play solo ofrece "Ir a RNE Audio". Desde
+septiembre de 2026 Explorar tampoco lo muestra; la portada de radio sigue en
+el código (`RtveUrls.RADIO_HOME`) sin punto de entrada hasta decidir si se
+expone y dónde.
+
+Menú de RTVE Play 8.8.1 verificado en `MenuFragment`: pestaña "Menú" de la
+barra inferior, lista plana en el orden del JSON y sin cabeceras; cada
+`submenu` se despliega en acordeón. OpenRTVE lo pinta como rejilla: las
+portadas del bloque principal sin cabecera y cada submenú como sección.
+
+Tipos de menú que reconoce la app de TV (`MenuUtils.checkMenuType`) y estado
+en OpenRTVE:
+
+| `tipo` | Estado |
+|---|---|
+| `portada`, `submenu` | Cubierto: Explorar |
+| `directos` | Parcial: solo las filas de directos de las portadas; sin pantalla por agrupadores |
+| `buscadorAZ` (`secciones.buscadorAZ.canales/categorias`) | Pendiente |
+| `parrilla` (`secciones.parrilla`) | Pendiente; las filas `Parrilla` de portada se descartan |
+| `portada4k` | Pendiente; requiere comprobar pantalla y códec |
+| `portadaCanalTematico` | Cubierto: sección "Canales temáticos" en Explorar; abre la lista con el directo (la app oficial muestra además su parrilla) |
+| `territoriales` (solo móvil) | Pendiente |
+| `seguirviendo` | Cubierto en local, sin cuenta |
+| `mislistas`, `iniciarSesion`, `cerrarsesion`, `control_parental` | Requieren cuenta (`A`) |
+| `configuracion`, `informacion`, `inAppHtml`, `intentApp` | Ajustes propios; el resto no aplica |
+
+## Filas de portada de RTVE Play 8.8.1
+
+Verificado en `PortadaAdapter` y sus layouts. El criterio es que todo lo que
+la app oficial muestra aparezca y que dos `tipo` con presentación distinta en
+RTVE Play también se distingan aquí, reinterpretados en Material 3 (los
+tamaños no se copian). Cuando la app oficial comparte holder (`directosTV` y
+`directosTV16`; `ColeccionCuadrado` y `ColeccionCuadradoPeq`, que solo
+cambian de tamaño), aquí también se comparte.
+
+| `tipo` | RTVE Play | OpenRTVE (`RowLayout`) |
+|---|---|---|
+| `ColeccionDestacado` | carrusel de 500dp con título, subtítulo y "Ver" | `HERO`: carrusel a ancho completo |
+| `ColeccionSuperDestacado` | un destacado: imagen, título, descripción, botón "Ver ahora" | `FEATURED`: tarjeta con imagen, título, descripción y botón |
+| `ColeccionPoster`, `videoPoster`, `programas` | pósters 2:3 (`imgPoster`) | `POSTER` |
+| `ColeccionSuper` | pósters altos 1:2 con el recorte `imgCol` | `POSTER_TALL`, con `imgCol` |
+| `ColeccionApaisado`, `videos`, `directosTV`, `directosTV16` | 16:9 | `LANDSCAPE` |
+| `ColeccionCuadrado`, `ColeccionCuadradoPeq` | cuadrada (215 / 137 dp) | `SQUARE` |
+| `ColleccionTops`, `Tops` | apaisada con número | `RANKED`: apaisada con número |
+| `links` | tiles con imagen y título; van inline en la fila (`links[]`) | tiles 16:9; `enlaceExterno` (web) se omite |
+| `StoriesPoster` | feed vertical de un CDN de terceros | excluida por diseño: host fuera de `rtve.es` |
+| `Parrilla` | guía embebida | futuro, junto con la Guía TV |
+| `seguirviendo` | historial de cuenta | local |
+| `recomendaciones`, `shorts` | recomendaciones por id de dispositivo; visor de vídeos verticales | descartados (decisión de septiembre de 2026) |
+| `favoritos`, `MiRtve`, `benidorm26`, `moduloNowNextCanal`, `LogoRadio`, `audios`, `moduloDirectoRadio` | cuenta, campañas o radio | no aplica |
+| `noLabels` | oculta el título bajo la tarjeta | ignorado (presentación) |
+
+Con esto, la portada cubre todos los `tipo` públicos de RTVE Play salvo
+`Parrilla`, con presentación propia en móvil y en Android TV.
 
 ## Condición para declarar paridad
 

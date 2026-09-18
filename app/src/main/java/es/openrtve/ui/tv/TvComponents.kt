@@ -51,6 +51,7 @@ import es.openrtve.R
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.ContentKind
 import es.openrtve.domain.RowLayout
+import es.openrtve.domain.imageFor
 
 /**
  * Pide el foco al entrar en la pantalla. Sin esto, al abrir un destino desde el
@@ -69,18 +70,21 @@ internal val TvVerticalMargin = 27.dp
 internal val TvRowPadding = PaddingValues(horizontal = TvHorizontalMargin)
 internal val TvCardShape = RoundedCornerShape(12.dp)
 internal val TvLandscapeWidth = 260.dp
+/** Degradado de las tarjetas con el título sobre la imagen. */
+private val TvTitleScrim = Brush.verticalGradient(0.3f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.85f))
 internal val TvPosterWidth = 150.dp
 internal val TvSquareWidth = 180.dp
 
 internal fun RowLayout.cardWidth(): Dp = when (this) {
-    RowLayout.HERO, RowLayout.LANDSCAPE -> TvLandscapeWidth
-    RowLayout.POSTER -> TvPosterWidth
+    RowLayout.HERO, RowLayout.FEATURED, RowLayout.LANDSCAPE, RowLayout.RANKED -> TvLandscapeWidth
+    RowLayout.POSTER, RowLayout.POSTER_TALL -> TvPosterWidth
     RowLayout.SQUARE -> TvSquareWidth
 }
 
 internal fun RowLayout.aspectRatio(): Float = when (this) {
-    RowLayout.HERO, RowLayout.LANDSCAPE -> 16f / 9f
+    RowLayout.HERO, RowLayout.FEATURED, RowLayout.LANDSCAPE, RowLayout.RANKED -> 16f / 9f
     RowLayout.POSTER -> 2f / 3f
+    RowLayout.POSTER_TALL -> 1f / 2f
     RowLayout.SQUARE -> 1f
 }
 
@@ -205,12 +209,10 @@ internal fun TvItemCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     progress: Float? = null,
+    /** Posición en un ranking ("Lo más visto"); se pinta grande sobre la imagen. */
+    rank: Int? = null,
 ) {
-    val image = when (layout) {
-        RowLayout.POSTER -> item.posterUrl ?: item.imageUrl
-        RowLayout.SQUARE -> item.squareUrl ?: item.imageUrl ?: item.posterUrl
-        else -> item.imageUrl
-    }
+    val image = item.imageFor(layout)
     val live = item.live
     val now = LocalNowMillis.current
     val context = LocalContext.current
@@ -219,6 +221,7 @@ internal fun TvItemCard(
         TvFocusSurface(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(layout.aspectRatio())) {
             TvArtwork(image, Modifier.fillMaxSize())
             live?.channelLogoUrl?.let { TvChannelLogo(it, Modifier.align(Alignment.TopStart)) }
+            rank?.let { TvRankBadge(it, Modifier.align(Alignment.BottomStart)) }
             (progress ?: liveProgress)?.let { TvProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
         }
         Spacer(Modifier.height(10.dp))
@@ -236,10 +239,10 @@ internal fun TvItemCard(
         Text(
             text = item.title,
             style = TvCardTitleStyle,
-            maxLines = if (layout == RowLayout.POSTER) 2 else 1,
+            maxLines = if (layout.isVertical) 2 else 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (layout != RowLayout.POSTER && (live == null || !live.isUpcomingAt(now))) {
+        if (!layout.isVertical && (live == null || !live.isUpcomingAt(now))) {
             item.subtitle?.let {
                 Text(
                     text = it,
@@ -251,6 +254,21 @@ internal fun TvItemCard(
             }
         }
     }
+}
+
+/** Número de ranking sobre la esquina de la imagen. */
+@Composable
+internal fun TvRankBadge(rank: Int, modifier: Modifier = Modifier) {
+    Text(
+        text = rank.toString(),
+        style = MaterialTheme.typography.displaySmall,
+        fontWeight = FontWeight.Black,
+        color = Color.White,
+        modifier = modifier
+            .padding(start = 10.dp, bottom = 6.dp)
+            .background(Color.Black.copy(alpha = 0.55f), TvCardShape)
+            .padding(horizontal = 10.dp),
+    )
 }
 
 /** Última tarjeta de cada fila: abre la rejilla completa sin sacar el foco de la fila. */
@@ -271,11 +289,7 @@ internal fun TvSeeAllCard(layout: RowLayout, onClick: () -> Unit) {
 internal fun TvImageTile(title: String, imageUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
     TvFocusSurface(onClick = onClick, modifier = modifier.aspectRatio(16f / 9f)) {
         TvArtwork(imageUrl, Modifier.fillMaxSize())
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Brush.verticalGradient(0.3f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.85f))),
-        )
+        Box(Modifier.fillMaxSize().background(TvTitleScrim))
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,

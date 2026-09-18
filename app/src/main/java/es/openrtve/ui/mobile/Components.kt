@@ -47,11 +47,17 @@ import coil3.compose.AsyncImage
 import es.openrtve.R
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.ContentKind
+import es.openrtve.domain.RowLayout
+import es.openrtve.domain.imageFor
 import es.openrtve.ui.metaLine
 import androidx.compose.ui.text.TextStyle
 import es.openrtve.ui.scheduleLabel
 
 internal val CardShape = RoundedCornerShape(10.dp)
+internal val FeaturedShape = RoundedCornerShape(14.dp)
+private val SquareCornerShape = RoundedCornerShape(0.dp)
+/** Degradado de las tarjetas con el título sobre la imagen. */
+private val TitleScrim = Brush.verticalGradient(0.3f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f))
 internal val ScreenPadding = 16.dp
 
 
@@ -186,6 +192,8 @@ internal fun ItemCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     progress: Float? = null,
+    /** Posición en un ranking ("Lo más visto"); se pinta grande sobre la imagen. */
+    rank: Int? = null,
 ) {
     val live = item.live
     val now = LocalNowMillis.current
@@ -194,6 +202,7 @@ internal fun ItemCard(
     Column(modifier = modifier.clip(CardShape).clickable(onClick = onClick)) {
         Artwork(item.imageUrl, 16f / 9f, Modifier.fillMaxWidth()) {
             live?.channelLogoUrl?.let { ChannelLogo(it, Modifier.align(Alignment.TopStart)) }
+            rank?.let { RankBadge(it, Modifier.align(Alignment.BottomStart)) }
             (progress ?: liveProgress)?.let { ProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
         }
         Spacer(Modifier.height(6.dp))
@@ -229,12 +238,101 @@ internal fun ItemCard(
     }
 }
 
+/** Número de ranking sobre la esquina de la imagen. */
+@Composable
+internal fun RankBadge(rank: Int, modifier: Modifier = Modifier) {
+    Text(
+        text = rank.toString(),
+        style = MaterialTheme.typography.displaySmall,
+        fontWeight = FontWeight.Black,
+        color = Color.White,
+        modifier = modifier
+            .padding(start = 8.dp, bottom = 4.dp)
+            .background(Color.Black.copy(alpha = 0.55f), CardShape)
+            .padding(horizontal = 8.dp),
+    )
+}
+
+/** Tarjeta 16:9 con el título sobre la imagen: categorías de Explorar y enlaces de portada. */
+@Composable
+internal fun ImageTile(title: String, imageUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Artwork(
+        url = imageUrl,
+        aspectRatio = 16f / 9f,
+        modifier = modifier
+            .clip(CardShape)
+            .clickable(onClick = onClick),
+    ) {
+        Box(Modifier.fillMaxSize().background(TitleScrim))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(10.dp),
+        )
+    }
+}
+
 /** Póster vertical 2:3 (series, cine). */
 @Composable
 internal fun PosterCard(item: CatalogItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier.clip(CardShape).clickable(onClick = onClick)) {
-        Artwork(item.posterUrl ?: item.imageUrl, 2f / 3f, Modifier.fillMaxWidth())
+        Artwork(item.imageFor(RowLayout.POSTER), 2f / 3f, Modifier.fillMaxWidth())
         CardCaption(item.title, subtitle = null)
+    }
+}
+
+/** Póster alto 1:2 (`ColeccionSuper`), con el recorte `imgCol` del programa; el póster normal es el respaldo. */
+@Composable
+internal fun TallPosterCard(item: CatalogItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.clip(CardShape).clickable(onClick = onClick)) {
+        Artwork(item.imageFor(RowLayout.POSTER_TALL), 1f / 2f, Modifier.fillMaxWidth())
+        CardCaption(item.title, subtitle = null)
+    }
+}
+
+/**
+ * Destacado único (`ColeccionSuperDestacado`): imagen, título, descripción y botón,
+ * como una tarjeta M3 a ancho completo. El primer item de la colección es el destacado.
+ */
+@Composable
+internal fun FeaturedCard(item: CatalogItem, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(FeaturedShape)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(onClick = onOpen),
+    ) {
+        Artwork(item.imageUrl, 16f / 9f, Modifier.fillMaxWidth(), shape = SquareCornerShape) {
+            item.live?.channelLogoUrl?.let { ChannelLogo(it, Modifier.align(Alignment.TopStart)) }
+        }
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            item.subtitle?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            Button(onClick = onOpen, modifier = Modifier.padding(top = 12.dp)) {
+                Text(stringResource(R.string.action_watch_now))
+            }
+        }
     }
 }
 
@@ -242,7 +340,7 @@ internal fun PosterCard(item: CatalogItem, onClick: () -> Unit, modifier: Modifi
 @Composable
 internal fun SquareCard(item: CatalogItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier.clip(CardShape).clickable(onClick = onClick)) {
-        Artwork(item.squareUrl ?: item.imageUrl ?: item.posterUrl, 1f, Modifier.fillMaxWidth(), overlay = item.liveOverlay())
+        Artwork(item.imageFor(RowLayout.SQUARE), 1f, Modifier.fillMaxWidth(), overlay = item.liveOverlay())
         CardCaption(item.title, item.subtitle)
     }
 }

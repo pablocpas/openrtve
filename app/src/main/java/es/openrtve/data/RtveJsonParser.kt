@@ -12,7 +12,9 @@ import es.openrtve.domain.SearchResults
 import es.openrtve.domain.VideoDetail
 import es.openrtve.domain.ContentKind
 import es.openrtve.domain.HomeFeed
+import es.openrtve.domain.HomeLink
 import es.openrtve.domain.HomeRow
+import es.openrtve.domain.LinkKind
 import es.openrtve.domain.LiveInfo
 import es.openrtve.domain.PreviewSprite
 import es.openrtve.domain.SpriteCue
@@ -41,19 +43,25 @@ class RtveJsonParser(
         val rows = root.array("rows")
             .orEmpty()
             .mapNotNull { it as? JsonObject }
-            .map { row ->
+            .mapNotNull { row ->
                 val presentation = row.text("tipo")
+                val isLinks = presentation.equals("links", ignoreCase = true)
+                val links = if (isLinks) homeLinks(row) else emptyList()
+                // Una fila `links` sin enlaces no aporta nada.
+                if (isLinks && links.isEmpty()) return@mapNotNull null
                 HomeRow(
                     id = -1,
                     title = row.text("title", "name").orEmpty(),
                     order = row.number("orden", "order") ?: Int.MAX_VALUE,
                     moduleType = row.text("moduleType"),
                     presentation = presentation,
-                    contentUrl = row.text("urlContent")?.takeIf(hostPolicy::isAllowed),
+                    // El `urlContent` de una fila `links` es otro documento (enlaces web); la app oficial usa los inline.
+                    contentUrl = row.text("urlContent")?.takeIf { !isLinks && hostPolicy.isAllowed(it) },
                     layout = rowLayout(presentation),
+                    links = links,
                 )
             }
-            // Enlaces y noticias no son reproducibles; la parrilla tiene otra estructura.
+            // Noticias no son reproducibles; la parrilla tiene otra estructura.
             .filterNot { it.presentation?.lowercase() in NON_CATALOG_ROWS }
             .sortedBy(HomeRow::order)
             .mapIndexed { index, row -> row.copy(id = index) }
@@ -102,55 +110,94 @@ class RtveJsonParser(
             }
 
     /**
-     * Categorías del menú de la app oficial (`menuBloques`), solo las portadas
-     * públicas. La radio se añade como un grupo más.
+     * Categorías del menú de la app oficial (`menuBloques` de televisión), solo
+     * las públicas. Cada `submenu` ("Otras temáticas", "Canales", "Canales
+     * temáticos") es un grupo con su propio título editorial. El árbol `radio`
+     * de la configuración no se expone: RTVE Play tampoco lo pinta (remite a la
+     * app RTVE Audio).
      */
     fun parseExplore(raw: String): List<ExploreGroup> {
         val root = json.parseToJsonElement(raw).jsonObject
-        val groups = root.obj("television")?.array("menuBloques")
+        // "CLAN" es un enlace a la app de Clan; su portada es la infantil de la propia configuración.
+        val clanPortada = root.obj("television")?.obj("secciones")?.obj("portadaInfantil")
+            ?.text("urlContent")?.let(hostPolicy::sanitize)
+        return root.obj("television")?.array("menuBloques")
             .orEmpty()
             .mapNotNull { it as? JsonObject }
-            .mapNotNull { block ->
-                val categories = block.array("menuItems")
-                    .orEmpty()
-                    .mapNotNull { it as? JsonObject }
-                    .filter { it.text("tipo") == "portada" && it.flag("subscriptor") != true }
-                    .mapNotNull { item ->
-                        ExploreCategory(
-                            title = item.text("title") ?: return@mapNotNull null,
-                            imageUrl = item.text("imgBackground")?.let(hostPolicy::sanitize),
-                            portadaUrl = item.text("urlContent")?.takeIf(hostPolicy::isAllowed)
-                                ?: return@mapNotNull null,
-                        )
-                    }
-                    .distinctBy(ExploreCategory::portadaUrl)
-                if (categories.isEmpty()) return@mapNotNull null
-                ExploreGroup(title = block.text("title").orEmpty(), categories = categories)
-            }
-        val radio = root.obj("radio")?.array("menuBloques")
-            .orEmpty()
-            .mapNotNull { it as? JsonObject }
-            .flatMap { it.array("menuItems").orEmpty() }
-            .mapNotNull { it as? JsonObject }
-            .filter { it.text("tipo") == "portada" }
-            .mapNotNull { item ->
-                ExploreCategory(
-                    title = item.text("title") ?: return@mapNotNull null,
-                    imageUrl = item.text("imgBackground")?.let(hostPolicy::sanitize),
-                    portadaUrl = item.text("urlContent")?.let(hostPolicy::sanitize) ?: return@mapNotNull null,
-                )
-            }
-        val radioGroup = ExploreGroup(
-            title = "Radio",
-            categories = listOf(ExploreCategory("Radio", null, RtveUrls.RADIO_HOME)) + radio,
-        )
-        return groups + radioGroup
+            .flatMap { block -> exploreGroups(block.flag("infantil") == true, block.array("menuItems"), clanPortada) }
     }
 
+    /**
+     * Las portadas directas de un bloque forman un grupo sin título (el nombre del
+     * bloque es interno); cada `submenu` forma el suyo ("OTRAS TEMÁTICAS" -> "Otras
+     * temáticas"). Un bloque sin portadas (cuenta, configuración, apps) no produce grupo.
+     */
+    private fun exploreGroups(isKids: Boolean, items: JsonArray?, clanPortada: String?): List<ExploreGroup> {
+        // La app oficial respeta el orden del JSON, no `orden`.
+        val objects = items.orEmpty().mapNotNull { it as? JsonObject }
+        val direct = exploreCategories(objects, clanPortada)
+        val submenus = objects
+            .filter { it.text("tipo") == "submenu" && it.flag("subscriptor") != true }
+            .mapNotNull { submenu ->
+                val title = submenu.text("title")?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+                val children = submenu.array("menuItems").orEmpty().mapNotNull { it as? JsonObject }
+                val categories = exploreCategories(children, clanPortada)
+                if (categories.isEmpty()) null else ExploreGroup(sentenceCase(title), categories)
+            }
+        return listOfNotNull(direct.takeIf { it.isNotEmpty() }?.let { ExploreGroup(title = null, categories = it, isKids = isKids) }) + submenus
+    }
+
+    /** Portadas, el enlace a la app de Clan (como su portada) y los canales temáticos en directo. */
+    private fun exploreCategories(items: List<JsonObject>, clanPortada: String?): List<ExploreCategory> = items
+        .filter { it.flag("subscriptor") != true }
+        .mapNotNull { item ->
+            val title = item.text("title") ?: return@mapNotNull null
+            val tipo = item.text("tipo")
+            val contentUrl = when (tipo) {
+                "portada", "portadaCanalTematico" -> item.text("urlContent")?.let(hostPolicy::sanitize)
+                "intentApp" -> clanPortada?.takeIf { item.text("appAndroid") == CLAN_PACKAGE }
+                else -> null
+            } ?: return@mapNotNull null
+            ExploreCategory(
+                title = title,
+                imageUrl = item.text("imgBackground")?.let(hostPolicy::sanitize),
+                contentUrl = contentUrl,
+                isLive = tipo == "portadaCanalTematico",
+            )
+        }
+        .distinctBy(ExploreCategory::contentUrl)
+
+    /** Accesos inline de una fila `links`; `enlaceExterno` (web) se omite. */
+    private fun homeLinks(row: JsonObject): List<HomeLink> = row.array("links")
+        .orEmpty()
+        .mapNotNull { it as? JsonObject }
+        .mapNotNull { link ->
+            val kind = when (link.text("tipo")) {
+                "collection" -> LinkKind.COLLECTION
+                "portadaPlay" -> LinkKind.PORTADA
+                "programaPlay" -> LinkKind.PROGRAM
+                "videoPlay" -> LinkKind.VIDEO
+                "audioPlay" -> LinkKind.AUDIO
+                else -> return@mapNotNull null
+            }
+            HomeLink(
+                title = link.text("title") ?: return@mapNotNull null,
+                imageUrl = firstAllowed(link.text("imgHorizontal", "image", "imgSquare")),
+                url = link.text("url")?.let(hostPolicy::sanitize) ?: return@mapNotNull null,
+                kind = kind,
+            )
+        }
+        // La URL es la clave de la tarjeta en la fila; un enlace repetido no aporta y rompería la lista.
+        .distinctBy(HomeLink::url)
+
+    /** Un valor por presentación de RTVE Play; `directosTV16` y `ColeccionCuadradoPeq` comparten holder con su base. */
     private fun rowLayout(presentation: String?): RowLayout = when (presentation?.lowercase()) {
-        "coleccionsuperdestacado", "colecciondestacado" -> RowLayout.HERO
-        "coleccionposter", "videoposter", "storiesposter" -> RowLayout.POSTER
+        "colecciondestacado" -> RowLayout.HERO
+        "coleccionsuperdestacado" -> RowLayout.FEATURED
+        "coleccionposter", "videoposter", "storiesposter", "programas" -> RowLayout.POSTER
+        "coleccionsuper" -> RowLayout.POSTER_TALL
         "coleccioncuadrado", "coleccioncuadradopeq" -> RowLayout.SQUARE
+        "collecciontops", "colecciontops", "tops" -> RowLayout.RANKED
         else -> RowLayout.LANDSCAPE
     }
 
@@ -258,6 +305,7 @@ class RtveJsonParser(
             kind = kind,
             posterUrl = posterImage(kind, id, media, item),
             squareUrl = squareImage(kind, id, media, item),
+            tallPosterUrl = if (kind == ContentKind.PROGRAM) derivedImage("p", id, "imgCol", POSTER_WIDTH) else null,
             programId = if (kind == ContentKind.PROGRAM) id else item.obj("programInfo")?.text("id"),
             directQualityUrl = media.array("qualities")
                 ?.mapNotNull { it as? JsonObject }
@@ -298,6 +346,10 @@ class RtveJsonParser(
             .apply { timeZone = TimeZone.getTimeZone("Europe/Madrid") }
             .parse(value)?.time
     }.getOrNull()
+
+    /** "OTRAS TEMÁTICAS" -> "Otras temáticas"; los títulos del menú llegan en mayúsculas. */
+    private fun sentenceCase(value: String): String =
+        if (value != value.uppercase()) value else value.lowercase().replaceFirstChar { it.uppercase() }
 
     /** "LA VUELTA 2026" -> "La Vuelta 2026"; los antetítulos llegan en mayúsculas. */
     private fun titleCase(value: String): String =
@@ -499,7 +551,8 @@ class RtveJsonParser(
 
     private companion object {
         val LIVE_EDITORIAL_TYPES = setOf("broadcast", "peticion", "directo")
-        val NON_CATALOG_ROWS = setOf("links", "noticias", "parrilla")
+        val NON_CATALOG_ROWS = setOf("noticias", "parrilla")
+        private const val CLAN_PACKAGE = "com.rtve.clan"
         const val IMAGE_SERVICE = "https://img.rtve.es"
         const val LANDSCAPE_WIDTH = 960
         const val POSTER_WIDTH = 480

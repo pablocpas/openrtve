@@ -1,6 +1,9 @@
 package es.openrtve.ui
 
 import es.openrtve.domain.BlockReason
+import es.openrtve.domain.ContentKind
+import es.openrtve.domain.HomeLink
+import es.openrtve.domain.LinkKind
 import es.openrtve.testing.catalogItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -59,5 +62,26 @@ class NavigationViewModelTest {
         assertEquals("el último mensaje sustituye al anterior", UiMessage.LinkNotFound, state.message)
         viewModel.dismissMessage()
         assertNull(state.message)
+    }
+
+    @Test
+    fun `home links open a collection, a portada or a detail by its api id`() {
+        val collection = HomeLink("Maratón", null, "https://api.rtve.es/api/collection/1900.json", LinkKind.COLLECTION).destination()
+        assertTrue(collection is Destination.Module)
+        assertEquals("https://api.rtve.es/api/collection/1900.json", (collection as Destination.Module).row.contentUrl)
+
+        val portada = HomeLink("Playz", null, "https://api.rtve.es/play/playz/index_apps.json", LinkKind.PORTADA).destination()
+        assertEquals(Destination.Portada("https://api.rtve.es/play/playz/index_apps.json", "Playz"), portada)
+
+        val program = HomeLink("Programa", null, "https://api.rtve.es/api/programas/1234.json", LinkKind.PROGRAM).destination()
+        assertEquals("1234", (program as Destination.Program).item.programId)
+        assertEquals(ContentKind.PROGRAM, program.item.kind)
+
+        val audio = HomeLink("Audio", null, "https://api.rtve.es/api/audios/99.json", LinkKind.AUDIO).destination()
+        assertEquals(ContentKind.AUDIO, (audio as Destination.Video).item.kind)
+        assertEquals("99", audio.item.playbackId)
+
+        // Sin id reconocible no hay destino: el enlace no lleva a ninguna parte en vez de abrir una ficha vacía.
+        assertNull(HomeLink("Raro", null, "https://www.rtve.es/play/algo/", LinkKind.VIDEO).destination())
     }
 }

@@ -8,16 +8,88 @@ object RtveUrls {
     const val SEARCH = "https://api.rtve.es/api/search/results"
 }
 
-/** Cómo pinta la UI una fila; se deduce del `tipo` editorial y nunca es un enum cerrado en el feed. */
+/** Qué recorte pinta cada presentación, con sus respaldos; la única definición para móvil y TV. */
+fun CatalogItem.imageFor(layout: RowLayout): String? = when (layout) {
+    RowLayout.POSTER -> posterUrl ?: imageUrl
+    RowLayout.POSTER_TALL -> tallPosterUrl ?: posterUrl ?: imageUrl
+    RowLayout.SQUARE -> squareUrl ?: imageUrl ?: posterUrl
+    RowLayout.HERO, RowLayout.FEATURED, RowLayout.LANDSCAPE, RowLayout.RANKED -> imageUrl
+}
+
+/** Item mínimo que solo aporta id y tipo: la pantalla de destino carga la ficha completa. */
+fun referenceItem(id: String, kind: ContentKind, title: String, imageUrl: String? = null) = CatalogItem(
+    id = id,
+    playbackId = if (kind == ContentKind.PROGRAM) null else id,
+    assetId = null,
+    title = title,
+    subtitle = null,
+    imageUrl = imageUrl,
+    kind = kind,
+    directQualityUrl = null,
+    allowedInCountry = null,
+    loginRequired = false,
+    paid = false,
+    drm = false,
+    programId = if (kind == ContentKind.PROGRAM) id else null,
+)
+
+/** Fila sintética de colección (`collection/{id}.json`), para abrirla desde un enlace. */
+fun collectionRow(url: String, title: String) = HomeRow(
+    id = -1,
+    title = title,
+    order = 0,
+    moduleType = "Collection",
+    presentation = "ColeccionPoster",
+    contentUrl = url,
+    layout = RowLayout.POSTER,
+)
+
+/** Fila sintética de directos sobre un feed de `lives`, para abrir un directo que no viene de una portada. */
+fun liveRow(url: String, title: String = "") = HomeRow(
+    id = -1,
+    title = title,
+    order = 0,
+    moduleType = "livesCollection",
+    presentation = "directosTV",
+    contentUrl = url,
+    layout = RowLayout.LANDSCAPE,
+)
+
+/**
+ * Cómo pinta la UI una fila; se deduce del `tipo` editorial y nunca es un enum
+ * cerrado en el feed. Cada valor corresponde a una presentación distinta en
+ * RTVE Play: dos `tipo` distintos de la API no se funden en una misma tarjeta.
+ */
 enum class RowLayout {
-    /** Carrusel a ancho completo, un item por página ("Slide > Home"). */
+    /** `ColeccionDestacado`: carrusel a ancho completo, un item por página. */
     HERO,
-    /** Pósters verticales 2:3. */
+    /** `ColeccionSuperDestacado`: un solo destacado con imagen, título, descripción y botón "Ver". */
+    FEATURED,
+    /** `ColeccionPoster`, `videoPoster`, `programas`: pósters verticales 2:3. */
     POSTER,
-    /** Tarjetas cuadradas (radio, música). */
+    /** `ColeccionSuper`: pósters altos 1:2 con la imagen `imgCol`, distinta del póster. */
+    POSTER_TALL,
+    /** `ColeccionCuadrado*`: tarjetas cuadradas (radio, música). */
     SQUARE,
-    /** Tarjetas apaisadas 16:9. */
+    /** `ColeccionApaisado`, `videos`, `directosTV*`: tarjetas apaisadas 16:9. */
     LANDSCAPE,
+    /** `ColleccionTops`, `Tops`: apaisadas con su posición en el ranking. */
+    RANKED,
+    ;
+
+    /** Tarjetas más altas que anchas: dos líneas de título y sin subtítulo. */
+    val isVertical: Boolean
+        get() = when (this) {
+            POSTER, POSTER_TALL -> true
+            HERO, FEATURED, SQUARE, LANDSCAPE, RANKED -> false
+        }
+
+    /** En rejilla los destacados no tienen sentido: se degradan a apaisada. */
+    val gridLayout: RowLayout
+        get() = when (this) {
+            HERO, FEATURED -> LANDSCAPE
+            POSTER, POSTER_TALL, SQUARE, LANDSCAPE, RANKED -> this
+        }
 }
 
 data class HomeFeed(
@@ -25,6 +97,25 @@ data class HomeFeed(
     val title: String,
     val rows: List<HomeRow>,
 )
+
+/** A qué apunta un enlace de una fila `links`; `enlaceExterno` sale de la app y no se modela. */
+enum class LinkKind { COLLECTION, PORTADA, PROGRAM, VIDEO, AUDIO }
+
+/** Acceso editorial de una fila `links`: viene completo en la portada, sin descarga. */
+data class HomeLink(
+    val title: String,
+    val imageUrl: String?,
+    val url: String,
+    val kind: LinkKind,
+) {
+    /** Último segmento numérico de la URL de la API (`/api/programas/1234.json` -> `1234`). */
+    val apiId: String?
+        get() = API_ID.find(url)?.groupValues?.get(1)
+
+    private companion object {
+        val API_ID = Regex("/(\\d+)(?:\\.json)?/?$")
+    }
+}
 
 data class HomeRow(
     /** Posición estable dentro de la portada; los títulos y `orden` pueden repetirse. */
@@ -35,7 +126,17 @@ data class HomeRow(
     val presentation: String?,
     val contentUrl: String?,
     val layout: RowLayout = RowLayout.LANDSCAPE,
+    /** Fila `links`: sus accesos vienen en la propia portada y `contentUrl` no se usa. */
+    val links: List<HomeLink> = emptyList(),
 ) {
+    /** Su contenido ya viene en la portada: no hay módulo que descargar. */
+    val isInline: Boolean
+        get() = links.isNotEmpty()
+
+    /** Se puede pintar: o trae su contenido, o tiene una fuente remota admitida. */
+    val isRenderable: Boolean
+        get() = isInline || contentUrl != null
+
     /** Módulo de emisoras de radio: llega sin `urlContent`; la fuente está en la configuración remota. */
     val isRadioLivesModule: Boolean
         get() = moduleType.equals("moduloDirectoRadio", ignoreCase = true) || presentation.equals("moduloDirectoRadio", ignoreCase = true)
@@ -68,6 +169,8 @@ data class CatalogItem(
     val posterUrl: String? = null,
     /** Imagen cuadrada 1:1 (radio, música). */
     val squareUrl: String? = null,
+    /** Imagen `imgCol` de un programa: el recorte alto (1:2) que usa `ColeccionSuper`; no es el póster. */
+    val tallPosterUrl: String? = null,
     val directQualityUrl: String?,
     val allowedInCountry: Boolean?,
     val loginRequired: Boolean,
@@ -167,15 +270,22 @@ data class QuickFilter(
     val contentUrl: String,
 )
 
+/** Entrada del menú de Explorar: una portada, o un canal temático en directo (`broadcasts/{id}.json`). */
 data class ExploreCategory(
     val title: String,
     val imageUrl: String?,
-    val portadaUrl: String,
+    val contentUrl: String,
+    val isLive: Boolean = false,
 )
 
+/**
+ * Sección de Explorar. Sin [title] es el bloque principal del menú, que la app
+ * oficial lista sin cabecera; [isKids] es el bloque infantil (`infantil: true`).
+ */
 data class ExploreGroup(
-    val title: String,
+    val title: String?,
     val categories: List<ExploreCategory>,
+    val isKids: Boolean = false,
 )
 
 /** Ficha completa de un vídeo (`videos/{id}.json`): lo que Findroid muestra en su pantalla de película. */

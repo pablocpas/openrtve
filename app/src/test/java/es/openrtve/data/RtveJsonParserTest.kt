@@ -1,6 +1,7 @@
 package es.openrtve.data
 
 import es.openrtve.domain.ContentKind
+import es.openrtve.domain.LinkKind
 import es.openrtve.domain.PlaybackDecision
 import es.openrtve.domain.PlaybackResolver
 import es.openrtve.domain.RowLayout
@@ -24,17 +25,33 @@ class RtveJsonParserTest {
                 {"title":"Dos","orden":2,"moduleType":"Future","tipo":"Nuevo"},
                 {"title":"Uno","orden":1,"moduleType":"Collection","urlContent":"https://api.rtve.es/api/collection/1.json"},
                 {"title":"Ajena","orden":3,"urlContent":"https://evil.example.org/collection/1.json"},
-                {"title":"Enlaces","orden":4,"tipo":"links","urlContent":"https://www.rtve.es/api/tematicas/1/links.json"}
+                {"title":"Enlaces vacíos","orden":4,"tipo":"links","urlContent":"https://www.rtve.es/api/tematicas/1/links.json"},
+                {"title":"Enlaces","orden":5,"tipo":"links","urlContent":"https://www.rtve.es/api/tematicas/1/links.json","links":[
+                  {"title":"Series para maratón","tipo":"collection","url":"https://api.rtve.es/api/collection/1900.json","image":"https://img.rtve.es/i/1.jpg","imgHorizontal":"https://img.rtve.es/i/1h.jpg"},
+                  {"title":"Playz","tipo":"portadaPlay","url":"https://api.rtve.es/play/playz/index_apps.json","image":"https://img.rtve.es/i/2.jpg"},
+                  {"title":"Un programa","tipo":"programaPlay","url":"https://api.rtve.es/api/programas/1234.json"},
+                  {"title":"Web","tipo":"enlaceExterno","url":"https://www.rtve.es/play/"},
+                  {"title":"Ajeno","tipo":"collection","url":"https://evil.example.org/collection/1.json"}
+                ]}
               ]
             }
             """.trimIndent(),
         )
 
-        assertEquals(listOf("Uno", "Dos", "Ajena"), result.rows.map { it.title })
-        assertEquals(listOf(0, 1, 2), result.rows.map { it.id })
+        assertEquals(listOf("Uno", "Dos", "Ajena", "Enlaces"), result.rows.map { it.title })
+        assertEquals(listOf(0, 1, 2, 3), result.rows.map { it.id })
         assertEquals("Future", result.rows[1].moduleType)
         assertEquals("Nuevo", result.rows[1].presentation)
         assertNull("las URLs fuera de la allowlist se descartan", result.rows[2].contentUrl)
+
+        // Los enlaces vienen en la propia fila; su `urlContent` (enlaces web) no se usa. Los externos y ajenos se omiten.
+        val links = result.rows[3].links
+        assertNull(result.rows[3].contentUrl)
+        assertEquals(listOf("Series para maratón", "Playz", "Un programa"), links.map { it.title })
+        assertEquals(listOf(LinkKind.COLLECTION, LinkKind.PORTADA, LinkKind.PROGRAM), links.map { it.kind })
+        assertEquals("https://img.rtve.es/i/1h.jpg", links[0].imageUrl)
+        assertEquals("https://img.rtve.es/i/2.jpg", links[1].imageUrl)
+        assertEquals("1234", links[2].apiId)
     }
 
     @Test
@@ -45,12 +62,16 @@ class RtveJsonParserTest {
               {"title":"b","orden":2,"tipo":"ColeccionPoster"},
               {"title":"c","orden":3,"tipo":"ColeccionCuadradoPeq"},
               {"title":"d","orden":4,"tipo":"directosTV"},
-              {"title":"e","orden":5,"tipo":"AlgoNuevo"}
+              {"title":"e","orden":5,"tipo":"AlgoNuevo"},
+              {"title":"f","orden":6,"tipo":"ColeccionSuper"},
+              {"title":"g","orden":7,"tipo":"programas"},
+              {"title":"h","orden":8,"tipo":"ColleccionTops"},
+              {"title":"i","orden":9,"tipo":"ColeccionDestacado"}
             ]}""",
         )
 
         assertEquals(
-            listOf(RowLayout.HERO, RowLayout.POSTER, RowLayout.SQUARE, RowLayout.LANDSCAPE, RowLayout.LANDSCAPE),
+            listOf(RowLayout.FEATURED, RowLayout.POSTER, RowLayout.SQUARE, RowLayout.LANDSCAPE, RowLayout.LANDSCAPE, RowLayout.POSTER_TALL, RowLayout.POSTER, RowLayout.RANKED, RowLayout.HERO),
             result.rows.map { it.layout },
         )
     }
@@ -82,7 +103,7 @@ class RtveJsonParserTest {
     }
 
     @Test
-    fun `explore keeps public portadas from the menu and appends radio`() {
+    fun `explore keeps public portadas from the television menu only`() {
         val groups = parser.parseExplore(
             """{
               "television":{"menuBloques":[
@@ -98,10 +119,70 @@ class RtveJsonParserTest {
             }""",
         )
 
-        assertEquals(listOf("Bloque de contenidos", "Radio"), groups.map { it.title })
+        // El árbol de radio de la configuración no se expone, como en RTVE Play; el bloque principal no lleva título.
+        assertEquals(listOf<String?>(null), groups.map { it.title })
         assertEquals(listOf("CINE"), groups[0].categories.map { it.title })
         assertEquals("https://img.rtve.es/cine.jpg", groups[0].categories.single().imageUrl)
-        assertEquals(listOf("Radio", "PODCAST"), groups[1].categories.map { it.title })
+    }
+
+    @Test
+    fun `explore turns each submenu into its own group`() {
+        val groups = parser.parseExplore(
+            """{
+              "television":{"menuBloques":[
+                {"title":"Bloque de contenidos","menuItems":[
+                  {"orden":1,"title":"CLAN","tipo":"intentApp","appAndroid":"com.rtve.clan"},
+                  {"orden":1,"title":"APP RNE","tipo":"intentApp","appAndroid":"es.rtve.playradio"},
+                  {"orden":0,"title":"TDP","tipo":"portada","urlContent":"https://www.rtve.es/play/teledeporte/index_apps.json"},
+                  {"title":"OTRAS TEMÁTICAS","tipo":"submenu","menuItems":[
+                    {"title":"COCINA","tipo":"portada","urlContent":"https://www.rtve.es/play/cocina/index_apps.json"},
+                    {"title":"SERIES","tipo":"portada","urlContent":"https://www.rtve.es/play/playplus/series/index_apps.json","subscriptor":true}
+                  ]},
+                  {"title":"CANALES","tipo":"submenu","menuItems":[
+                    {"title":"LA 1","tipo":"portada","logo":"https://img.rtve.es/la1.png","urlContent":"https://www.rtve.es/play/la-1/index_apps.json"},
+                    {"title":"TELEDEPORTE","tipo":"portada","urlContent":"https://www.rtve.es/play/teledeporte/index_apps.json"}
+                  ]},
+                  {"title":"CANALES TEMÁTICOS","tipo":"submenu","menuItems":[
+                    {"title":"RTVE COCINA","tipo":"portadaCanalTematico","urlContent":"https://api.rtve.es/api/lives/broadcasts/1.json"}
+                  ]},
+                  {"title":"A-Z","tipo":"buscadorAZ"}
+                ]},
+                {"title":"Bloque de INFANTIL","infantil":true,"menuItems":[
+                  {"title":"JUNIOR","tipo":"portada","urlContent":"https://www.rtve.es/play/clan/edad/junior/index_apps.json"}
+                ]},
+                {"title":"Bloque apps","menuItems":[{"title":"OTRAS APPS","tipo":"submenu","menuItems":[{"title":"APP CLAN","tipo":"intentApp"}]}]}
+              ],"secciones":{"portadaInfantil":{"urlContent":"https://www.rtve.es/play/clan/index_apps.json"}}},
+              "radio":{"menuBloques":[{"title":"Bloque de contenidos","menuItems":[
+                {"title":"PODCAST","tipo":"portada","urlContent":"https://rtve.es/play/radio/podcasts/index_apps.json"},
+                {"title":"TEMÁTICAS","tipo":"submenu","menuItems":[
+                  {"title":"MÚSICA","tipo":"portada","urlContent":"https://rtve.es/play/radio/musica/index_apps.json"}
+                ]},
+                {"title":"EMISORAS","tipo":"submenu","menuItems":[
+                  {"title":"RADIO 3","tipo":"portada","urlContent":"https://www.rtve.es/play/radio/radio-3/index_apps.json"}
+                ]}
+              ]}]}
+            }""",
+        )
+
+        assertEquals(
+            listOf(null, "Otras temáticas", "Canales", "Canales temáticos", null),
+            groups.map { it.title },
+        )
+        // Solo el bloque marcado `infantil` se señala como tal; los nombres internos de bloque no se muestran.
+        assertEquals(listOf(false, false, false, false, true), groups.map { it.isKids })
+        // Orden del JSON, como la app oficial; el enlace a la app de Clan pasa a ser su portada, el resto de apps se omite.
+        assertEquals(listOf("CLAN", "TDP"), groups[0].categories.map { it.title })
+        assertEquals("https://www.rtve.es/play/clan/index_apps.json", groups[0].categories[0].contentUrl)
+        // Play+ se filtra también dentro de los submenús.
+        assertEquals(listOf("COCINA"), groups[1].categories.map { it.title })
+        // La misma portada puede repetirse entre grupos, como en el menú oficial; los logos no son fondos.
+        assertEquals(listOf("LA 1", "TELEDEPORTE"), groups[2].categories.map { it.title })
+        assertEquals(null, groups[2].categories.first().imageUrl)
+        // Un canal temático es un directo, no una portada.
+        assertEquals(listOf("RTVE COCINA"), groups[3].categories.map { it.title })
+        assertTrue(groups[3].categories.single().isLive)
+        assertEquals("https://api.rtve.es/api/lives/broadcasts/1.json", groups[3].categories.single().contentUrl)
+        assertEquals(listOf("JUNIOR"), groups[4].categories.map { it.title })
     }
 
     @Test
@@ -360,6 +441,9 @@ class RtveJsonParserTest {
         assertEquals("https://img.rtve.es/v/1/vertical?w=480", items[0].posterUrl)
         assertEquals("https://img.rtve.es/p/2?imgProgApi=imgPoster&w=480", items[1].posterUrl)
         assertEquals("https://img.rtve.es/p/2?imgProgApi=imgBackground&w=480", items[1].squareUrl)
+        // ColeccionSuper usa otro recorte del programa (imgCol); los vídeos no lo tienen.
+        assertEquals("https://img.rtve.es/p/2?imgProgApi=imgCol&w=480", items[1].tallPosterUrl)
+        assertNull(items[0].tallPosterUrl)
     }
 
     @Test

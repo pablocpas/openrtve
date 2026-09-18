@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +53,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import es.openrtve.domain.CatalogItem
+import es.openrtve.domain.HomeLink
 import es.openrtve.domain.HomeRow
 import es.openrtve.domain.RowLayout
 import es.openrtve.ui.HomeSection
@@ -72,6 +74,7 @@ fun TvPortadaScreen(
     onOpenRow: (HomeRow, String) -> Unit,
     onError: (String) -> Unit,
     history: WatchHistory? = null,
+    onOpenLink: (HomeLink) -> Unit = {},
 ) {
     val viewModel: PortadaViewModel = viewModel(
         key = "portada-$url",
@@ -104,7 +107,7 @@ fun TvPortadaScreen(
             viewModel.dismissError()
         }
     }
-    val firstLoadedId = state.sections.firstOrNull { it.state is SectionState.Loaded }?.row?.id
+    val firstLoadedId = state.sections.firstOrNull { it.state is SectionState.Loaded || it.state is SectionState.Links }?.row?.id
     LaunchedEffect(firstLoadedId) {
         if (firstLoadedId != null) runCatching { firstRowFocus.requestFocus() }
     }
@@ -133,6 +136,7 @@ fun TvPortadaScreen(
                     // Como en Findroid: las filas se recolocan con animación si otra cambia de alto.
                     modifier = Modifier.animateItem().then(if (section.row.id == firstLoadedId) Modifier.focusRequester(firstRowFocus) else Modifier),
                     onOpenItem = onOpenItem,
+                    onOpenLink = onOpenLink,
                     onSeeAll = { onOpenRow(section.row, section.title) },
                     onRetry = { viewModel.retrySection(section.row) },
                 )
@@ -167,6 +171,7 @@ private fun TvSection(
     section: HomeSection,
     modifier: Modifier,
     onOpenItem: (CatalogItem) -> Unit,
+    onOpenLink: (HomeLink) -> Unit,
     onSeeAll: () -> Unit,
     onRetry: () -> Unit,
 ) {
@@ -199,18 +204,81 @@ private fun TvSection(
                 Text(state.error.text(context), style = MaterialTheme.typography.bodyLarge)
                 Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
             }
+            // Los enlaces ya están todos en la fila: sin "ver todo".
+            is SectionState.Links -> LazyRow(
+                contentPadding = TvRowPadding,
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                modifier = modifier.focusRestorer(),
+            ) {
+                items(state.links, key = { it.url }) { link ->
+                    TvImageTile(link.title, link.imageUrl, { onOpenLink(link) }, Modifier.width(TvLandscapeWidth))
+                }
+            }
             is SectionState.Loaded -> when (layout) {
                 RowLayout.HERO -> TvHeroRow(state.items, onOpenItem, modifier)
+                RowLayout.FEATURED -> state.items.firstOrNull()?.let { item ->
+                    TvFeaturedCard(item, { onOpenItem(item) }, modifier.padding(TvRowPadding))
+                }
                 else -> LazyRow(
                     contentPadding = TvRowPadding,
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                     modifier = modifier.focusRestorer(),
                 ) {
-                    items(state.items, key = { it.id }) { item ->
-                        TvItemCard(item, layout, { onOpenItem(item) }, Modifier.width(layout.cardWidth()))
+                    itemsIndexed(state.items, key = { _, it -> it.id }) { index, item ->
+                        TvItemCard(
+                            item,
+                            layout,
+                            { onOpenItem(item) },
+                            Modifier.width(layout.cardWidth()),
+                            rank = (index + 1).takeIf { layout == RowLayout.RANKED },
+                        )
                     }
                     item(key = "see-all") { TvSeeAllCard(layout, onSeeAll) }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Destacado único (`ColeccionSuperDestacado`): imagen ancha y, al lado, título,
+ * descripción y "Ver ahora". Una sola superficie enfocable.
+ */
+@Composable
+private fun TvFeaturedCard(item: CatalogItem, onOpen: () -> Unit, modifier: Modifier) {
+    TvFocusSurface(onClick = onOpen, modifier = modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth()) {
+            Box(Modifier.width(TvHeroWidth).aspectRatio(16f / 9f)) {
+                TvArtwork(item.imageUrl, Modifier.fillMaxSize())
+                item.live?.channelLogoUrl?.let { TvChannelLogo(it, Modifier.align(Alignment.TopStart)) }
+            }
+            Column(
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.weight(1f).padding(horizontal = 24.dp, vertical = 16.dp),
+            ) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                item.subtitle?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.action_watch_now),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 14.dp),
+                )
             }
         }
     }
