@@ -28,7 +28,11 @@ class RtveHostPolicy(private val rootDomain: String = "rtve.es") {
      * validar porque los hosts de RTVE lo sirven.
      */
     fun sanitize(value: String): String? {
-        val upgraded = value.trim().replaceFirst(Regex("^http://", RegexOption.IGNORE_CASE), "https://")
+        val upgraded = value.trim().replaceFirst(HTTP_SCHEME, "https://")
         return upgraded.takeIf(::isAllowed)
+    }
+
+    private companion object {
+        val HTTP_SCHEME = Regex("^http://", RegexOption.IGNORE_CASE)
     }
 }

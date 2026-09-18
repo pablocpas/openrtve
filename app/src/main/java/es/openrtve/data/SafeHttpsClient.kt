@@ -3,7 +3,10 @@ package es.openrtve.data
 import es.openrtve.domain.RtveHostPolicy
 import java.io.IOException
 import java.net.URI
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -47,7 +50,7 @@ class SafeHttpsClient(
                 .header("User-Agent", USER_AGENT)
                 .apply { if (etag != null && hop == 0) header("If-None-Match", etag) }
                 .build()
-            client.newCall(request).execute().use { response ->
+            client.newCall(request).executeInterruptibly().use { response ->
                 when {
                     response.code == 304 && etag != null -> return TextResponse(body = null, etag = etag)
                     response.isRedirect -> {
@@ -67,6 +70,39 @@ class SafeHttpsClient(
             }
         }
         throw IOException("No se pudo completar la petición")
+    }
+
+    /**
+     * Como `execute()`, pero si interrumpen el hilo (una corrutina cancelada bajo
+     * `runInterruptible`) la llamada se cancela y la conexión se libera, en vez de
+     * seguir descargando hasta el timeout. La lectura de socket de OkHttp no
+     * responde a `Thread.interrupt()`; esperar en un latch sí.
+     */
+    private fun Call.executeInterruptibly(): Response {
+        val done = CountDownLatch(1)
+        var result: Response? = null
+        var failure: IOException? = null
+        enqueue(
+            object : Callback {
+                // El cuerpo lo lee quien espera; aquí solo se entrega.
+                override fun onResponse(call: Call, response: Response) {
+                    result = response
+                    done.countDown()
+                }
+
+                override fun onFailure(call: Call, e: IOException) {
+                    failure = e
+                    done.countDown()
+                }
+            },
+        )
+        try {
+            done.await()
+        } catch (interrupted: InterruptedException) {
+            cancel()
+            throw interrupted
+        }
+        return result ?: throw (failure ?: IOException("Sin respuesta"))
     }
 
     companion object {

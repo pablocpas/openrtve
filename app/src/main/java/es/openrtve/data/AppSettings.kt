@@ -2,8 +2,10 @@ package es.openrtve.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 data class Settings(
@@ -26,19 +28,19 @@ data class Settings(
 class AppSettings(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val mutableSettings = MutableStateFlow(read())
-    val settings: StateFlow<Settings> = mutableSettings
+    val settings: StateFlow<Settings> = mutableSettings.asStateFlow()
 
     val current: Settings get() = mutableSettings.value
 
     fun update(transform: (Settings) -> Settings) {
         val updated = transform(current)
-        prefs.edit()
-            .putBoolean(KEY_PIP, updated.pictureInPictureOnLeave)
-            .putBoolean(KEY_BACKGROUND_AUDIO, updated.backgroundAudio)
-            .putInt(KEY_MAX_HEIGHT, updated.maxVideoHeight)
-            .putBoolean(KEY_SUBTITLES, updated.subtitlesByDefault)
-            .putBoolean(KEY_AUTOPLAY, updated.autoplayNext)
-            .apply()
+        prefs.edit {
+            putBoolean(KEY_PIP, updated.pictureInPictureOnLeave)
+            putBoolean(KEY_BACKGROUND_AUDIO, updated.backgroundAudio)
+            putInt(KEY_MAX_HEIGHT, updated.maxVideoHeight)
+            putBoolean(KEY_SUBTITLES, updated.subtitlesByDefault)
+            putBoolean(KEY_AUTOPLAY, updated.autoplayNext)
+        }
         mutableSettings.update { updated }
     }
 

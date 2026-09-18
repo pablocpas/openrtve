@@ -6,12 +6,13 @@ import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import kotlinx.coroutines.Dispatchers
 import org.junit.Test
 
 class WatchHistoryTest {
     private val file = Files.createTempDirectory("openrtve-history").resolve("history.json").toFile()
     private var now = 1_000_000L
-    private val history = WatchHistory(file, nowMillis = { now })
+    private val history = WatchHistory(file, nowMillis = { now }, ioDispatcher = Dispatchers.Unconfined)
 
     @Test
     fun `progress is kept per item, finished items drop out and short positions do not count`() {
@@ -40,7 +41,7 @@ class WatchHistoryTest {
         now += 10
         history.updateProgress("v1", positionMs = 120_000, durationMs = 600_000)
 
-        val reloaded = WatchHistory(file, nowMillis = { now })
+        val reloaded = WatchHistory(file, nowMillis = { now }, ioDispatcher = Dispatchers.Unconfined)
         val entry = reloaded.entryFor("v1")!!
         assertEquals(120_000L, entry.positionMs)
         assertEquals("Vídeo v1", entry.item.title)

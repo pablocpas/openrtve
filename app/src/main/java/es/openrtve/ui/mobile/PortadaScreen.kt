@@ -36,7 +36,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,28 +47,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
 import es.openrtve.data.WatchEntry
 import es.openrtve.data.WatchHistory
 import androidx.compose.runtime.remember
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleResumeEffect
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.HomeLink
 import es.openrtve.domain.HomeRow
 import es.openrtve.domain.RowLayout
 import es.openrtve.ui.HomeSection
-import es.openrtve.ui.PortadaViewModel
 import es.openrtve.ui.SectionState
+import es.openrtve.ui.rememberPortadaScreen
 import es.openrtve.ui.text
 
 /**
@@ -91,38 +80,11 @@ fun PortadaScreen(
     history: WatchHistory? = null,
     onOpenLink: (HomeLink) -> Unit = {},
 ) {
-    val viewModel: PortadaViewModel = viewModel(
-        key = "portada-$url",
-        factory = viewModelFactory { initializer { PortadaViewModel(repository, url) } },
-    )
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val screen = rememberPortadaScreen(repository, url, history, onError)
+    val viewModel = screen.viewModel
+    val state = screen.state
+    val resumable = screen.resumable
     val isRoot = onBack == null
-    val historyEntries by (history?.entries ?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle()
-    val resumable = remember(historyEntries) { history?.resumable.orEmpty() }
-
-    // Refresco como la app oficial: al volver a primer plano y, para los directos, cada minuto en pantalla.
-    LifecycleResumeEffect(viewModel) {
-        viewModel.onResumed()
-        onPauseOrDispose { }
-    }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(viewModel) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            while (true) {
-                delay(LIVE_REFRESH_MS)
-                viewModel.refreshLiveSections()
-            }
-        }
-    }
-
-    state.error?.let { error ->
-        val text = error.text(context)
-        LaunchedEffect(error) {
-            onError(text)
-            viewModel.dismissError()
-        }
-    }
 
     Column(Modifier.fillMaxSize()) {
         if (!isRoot) {
@@ -352,11 +314,10 @@ private fun PlaceholderRow(layout: RowLayout, fullBleedHero: Boolean) {
         )
         return
     }
-    val (width, ratio) = when (layout) {
-        RowLayout.POSTER -> Pair(PosterWidth, 2f / 3f)
-        RowLayout.POSTER_TALL -> Pair(PosterWidth, 1f / 2f)
-        RowLayout.SQUARE -> Pair(SquareWidth, 1f)
-        RowLayout.LANDSCAPE, RowLayout.RANKED, RowLayout.HERO, RowLayout.FEATURED -> Pair(LandscapeWidth, 16f / 9f)
+    val width = when (layout) {
+        RowLayout.POSTER, RowLayout.POSTER_TALL -> PosterWidth
+        RowLayout.SQUARE -> SquareWidth
+        RowLayout.LANDSCAPE, RowLayout.RANKED, RowLayout.HERO, RowLayout.FEATURED -> LandscapeWidth
     }
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -366,7 +327,7 @@ private fun PlaceholderRow(layout: RowLayout, fullBleedHero: Boolean) {
             Box(
                 modifier = Modifier
                     .width(width)
-                    .aspectRatio(ratio)
+                    .aspectRatio(layout.aspectRatio)
                     .clip(CardShape)
                     .background(MaterialTheme.colorScheme.surface),
             )
@@ -375,6 +336,5 @@ private fun PlaceholderRow(layout: RowLayout, fullBleedHero: Boolean) {
 }
 
 private val LandscapeWidth = 220.dp
-private const val LIVE_REFRESH_MS = 60_000L
 private val PosterWidth = 130.dp
 private val SquareWidth = 150.dp

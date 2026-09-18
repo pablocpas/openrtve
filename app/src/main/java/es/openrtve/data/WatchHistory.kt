@@ -1,10 +1,19 @@
 package es.openrtve.data
 
+import androidx.core.util.AtomicFile
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.ContentKind
 import java.io.File
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -31,14 +40,24 @@ data class WatchEntry(
 /**
  * "Seguir viendo" local, sin cuenta: un fichero JSON con las últimas
  * reproducciones y su posición. Lo escribe el reproductor y lo lee la portada.
+ *
+ * El estado en memoria cambia al instante (hilo principal); el fichero se
+ * escribe aparte, en [ioDispatcher] y de forma atómica, para que un guardado
+ * cada pocos segundos durante la reproducción no toque el disco desde la UI.
  */
 class WatchHistory(
-    private val file: File,
+    file: File,
     private val json: Json = Json,
     private val nowMillis: () -> Long = System::currentTimeMillis,
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
+    private val file = AtomicFile(file)
     private val mutableEntries = MutableStateFlow(load())
-    val entries: StateFlow<List<WatchEntry>> = mutableEntries
+    val entries: StateFlow<List<WatchEntry>> = mutableEntries.asStateFlow()
+
+    /** Vive lo que la app: el historial es un singleton del contenedor. */
+    private val writer = CoroutineScope(SupervisorJob() + ioDispatcher)
+    private val writeLock = Mutex()
 
     fun entryFor(itemId: String): WatchEntry? = mutableEntries.value.firstOrNull { it.item.id == itemId }
 
@@ -85,15 +104,25 @@ class WatchHistory(
             .sortedByDescending { it.updatedAtMillis }
             .take(MAX_ENTRIES)
         mutableEntries.value = trimmed
-        runCatching {
-            file.parentFile?.mkdirs()
-            file.writeText(buildJsonArray { trimmed.forEach { add(it.toJson()) } }.toString())
+        // Siempre se vuelca el estado más reciente: dos escrituras encoladas no pueden dejar una vieja.
+        writer.launch { writeLock.withLock { persist(mutableEntries.value) } }
+    }
+
+    private fun persist(entries: List<WatchEntry>) {
+        val bytes = buildJsonArray { entries.forEach { add(it.toJson()) } }.toString().toByteArray(Charsets.UTF_8)
+        file.baseFile.parentFile?.mkdirs()
+        val output = runCatching { file.startWrite() }.getOrNull() ?: return
+        try {
+            output.write(bytes)
+            file.finishWrite(output)
+        } catch (error: Exception) {
+            file.failWrite(output)
         }
     }
 
     private fun load(): List<WatchEntry> = runCatching {
-        if (!file.isFile) return emptyList()
-        json.parseToJsonElement(file.readText()).jsonArray
+        if (!file.baseFile.isFile) return emptyList()
+        json.parseToJsonElement(file.readFully().toString(Charsets.UTF_8)).jsonArray
             .mapNotNull { (it as? JsonObject)?.toEntry() }
             .sortedByDescending { it.updatedAtMillis }
     }.getOrDefault(emptyList())

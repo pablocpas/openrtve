@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -26,10 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -39,10 +33,9 @@ import es.openrtve.data.CatalogRepository
 import es.openrtve.data.WatchHistory
 import androidx.compose.runtime.remember
 import es.openrtve.domain.CatalogItem
-import es.openrtve.ui.VideoViewModel
 import es.openrtve.ui.feedDateToDisplay
+import es.openrtve.ui.rememberVideoScreen
 import es.openrtve.ui.metaLine
-import es.openrtve.ui.text
 
 /** Ficha de vídeo/película en TV: fondo a pantalla completa, texto a la izquierda y botones grandes. */
 @Composable
@@ -54,23 +47,11 @@ fun TvVideoScreen(
     onOpenProgram: (programId: String, title: String) -> Unit,
     onError: (String) -> Unit,
 ) {
-    val viewModel: VideoViewModel = viewModel(
-        key = "video-${item.id}",
-        factory = viewModelFactory { initializer { VideoViewModel(repository, item) } },
-    )
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val screen = rememberVideoScreen(repository, history, item, onError)
+    val state = screen.state
+    val resume = screen.resume
     val context = LocalContext.current
     val background = MaterialTheme.colorScheme.background
-    val historyEntries by history.entries.collectAsStateWithLifecycle()
-    val resume = remember(historyEntries, state.item.id) { history.entryFor(state.item.id)?.takeIf { it.inProgress } }
-
-    state.error?.let { error ->
-        val text = error.text(context)
-        LaunchedEffect(error) {
-            onError(text)
-            viewModel.dismissError()
-        }
-    }
 
     val detail = state.detail
     Box(Modifier.fillMaxSize()) {
@@ -122,7 +103,7 @@ fun TvVideoScreen(
             Spacer(Modifier.height(20.dp))
             detail?.description?.let {
                 Text(
-                    text = AnnotatedString.fromHtml(it),
+                    text = remember(it) { AnnotatedString.fromHtml(it) },
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 5,
                     overflow = TextOverflow.Ellipsis,

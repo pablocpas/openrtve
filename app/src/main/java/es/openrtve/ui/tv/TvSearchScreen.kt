@@ -22,8 +22,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.platform.LocalContext
@@ -32,10 +30,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -43,7 +37,8 @@ import es.openrtve.R
 import es.openrtve.data.CatalogRepository
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.RowLayout
-import es.openrtve.ui.SearchViewModel
+import es.openrtve.ui.FilterState
+import es.openrtve.ui.rememberSearchScreen
 import es.openrtve.ui.text
 
 /** Búsqueda en TV: campo arriba, filtros rápidos en una fila desplazable y rejilla debajo. */
@@ -53,20 +48,11 @@ fun TvSearchScreen(
     onOpenItem: (CatalogItem) -> Unit,
     onError: (String) -> Unit,
 ) {
-    val viewModel: SearchViewModel = viewModel(
-        factory = viewModelFactory { initializer { SearchViewModel(repository) } },
-    )
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val screen = rememberSearchScreen(repository, onError)
+    val viewModel = screen.viewModel
+    val state = screen.state
     val context = LocalContext.current
     val keyboard = LocalSoftwareKeyboardController.current
-
-    state.error?.let { error ->
-        val text = error.text(context)
-        LaunchedEffect(error) {
-            onError(text)
-            viewModel.dismissError()
-        }
-    }
 
     Column(Modifier.fillMaxSize()) {
         TvScreenTitle(stringResource(R.string.tab_search))
@@ -106,16 +92,25 @@ fun TvSearchScreen(
         }
         val results = state.results
         when {
-            state.isTextSearch && results == null -> Box(Modifier.fillMaxSize())
-            state.isTextSearch && results!!.isEmpty -> TvCenterMessage(stringResource(R.string.search_empty))
-            state.isTextSearch -> LazyVerticalGrid(
+            !state.isTextSearch -> when (val filter = state.filter) {
+                FilterState.Loading -> TvCenterMessage(stringResource(R.string.state_loading))
+                is FilterState.Failed -> TvCenterMessage(filter.error.text(context), viewModel::retryFilter)
+                is FilterState.Loaded -> if (filter.items.isEmpty()) {
+                    TvCenterMessage(stringResource(R.string.state_empty_module), viewModel::retryFilter)
+                } else {
+                    TvItemGrid(filter.items, RowLayout.POSTER, onOpenItem)
+                }
+            }
+            results == null -> Box(Modifier.fillMaxSize())
+            results.isEmpty -> TvCenterMessage(stringResource(R.string.search_empty))
+            else -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = TvLandscapeWidth),
                 contentPadding = PaddingValues(start = TvHorizontalMargin, end = TvHorizontalMargin, bottom = TvVerticalMargin),
                 horizontalArrangement = Arrangement.spacedBy(20.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                if (results!!.programs.isNotEmpty()) {
+                if (results.programs.isNotEmpty()) {
                     item(key = "programs", span = { GridItemSpan(maxLineSpan) }) {
                         Text(stringResource(R.string.search_programs), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                     }
@@ -132,8 +127,6 @@ fun TvSearchScreen(
                     }
                 }
             }
-            state.filterItems.isEmpty() -> TvCenterMessage(stringResource(R.string.state_loading))
-            else -> TvItemGrid(state.filterItems, RowLayout.POSTER, onOpenItem)
         }
     }
 }

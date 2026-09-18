@@ -1,5 +1,6 @@
 package es.openrtve.playback
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.media.AudioManager
 import android.view.GestureDetector
@@ -99,6 +100,9 @@ class PlayerGestures(
         },
     )
 
+    // `PlayerView.performClick()` alterna los controles por su cuenta y pisaría el toque simple de aquí;
+    // los botones del controlador siguen siendo accesibles con TalkBack.
+    @SuppressLint("ClickableViewAccessibility")
     override fun onTouch(view: View, event: MotionEvent): Boolean {
         detector.onTouchEvent(event)
         if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {

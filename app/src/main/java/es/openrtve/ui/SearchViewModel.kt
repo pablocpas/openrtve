@@ -18,18 +18,26 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Contenido del filtro rápido seleccionado: cargando, cargado (quizá vacío) o fallido. */
+sealed interface FilterState {
+    data object Loading : FilterState
+    data class Loaded(val items: List<CatalogItem>) : FilterState
+    data class Failed(val error: LoadError) : FilterState
+}
+
 data class SearchUiState(
     val query: String = "",
     val filters: List<QuickFilter> = emptyList(),
     val selectedFilter: QuickFilter? = null,
     /** Items del filtro rápido seleccionado (cuando no hay texto). */
-    val filterItems: List<CatalogItem> = emptyList(),
+    val filter: FilterState = FilterState.Loading,
     /** Resultados del texto escrito (a partir de [MIN_QUERY_LENGTH] caracteres). */
     val results: SearchResults? = null,
     val isSearching: Boolean = false,
     val error: LoadError? = null,
 ) {
     val isTextSearch: Boolean get() = query.trim().length >= MIN_QUERY_LENGTH
+    val filterItems: List<CatalogItem> get() = (filter as? FilterState.Loaded)?.items.orEmpty()
 
     companion object {
         const val MIN_QUERY_LENGTH = 3
@@ -69,19 +77,28 @@ class SearchViewModel(
     fun clearQuery() = setQuery("")
 
     fun selectFilter(filter: QuickFilter) {
-        if (filter == mutableUiState.value.selectedFilter && mutableUiState.value.filterItems.isNotEmpty()) return
+        val current = mutableUiState.value
+        if (filter == current.selectedFilter && current.filter is FilterState.Loaded) return
         filterJob?.cancel()
-        mutableUiState.update { it.copy(selectedFilter = filter, filterItems = emptyList(), error = null) }
+        mutableUiState.update { it.copy(selectedFilter = filter, filter = FilterState.Loading) }
         filterJob = viewModelScope.launch {
-            try {
-                val module = repository.loadQuickFilterItems(filter)
-                mutableUiState.update { it.copy(filterItems = module.value.items) }
+            val loaded = try {
+                FilterState.Loaded(repository.loadQuickFilterItems(filter).value.items)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                mutableUiState.update { it.copy(error = error.toLoadError()) }
+                // El fallo se pinta en el sitio del filtro, con su reintento; no como aviso suelto.
+                FilterState.Failed(error.toLoadError())
             }
+            mutableUiState.update { it.copy(filter = loaded) }
         }
+    }
+
+    /** Vuelve a pedir el filtro seleccionado tras un fallo. */
+    fun retryFilter() {
+        val filter = mutableUiState.value.selectedFilter ?: return
+        mutableUiState.update { it.copy(filter = FilterState.Loading) }
+        selectFilter(filter)
     }
 
     fun dismissError() {

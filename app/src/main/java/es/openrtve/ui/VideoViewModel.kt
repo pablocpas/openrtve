@@ -7,6 +7,7 @@ import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.ContentKind
 import es.openrtve.domain.VideoDetail
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +29,7 @@ class VideoViewModel(
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(VideoUiState(item = item))
     val uiState: StateFlow<VideoUiState> = mutableUiState.asStateFlow()
+    private var job: Job? = null
 
     init {
         load()
@@ -41,7 +43,8 @@ class VideoViewModel(
 
     private fun load() {
         val id = mutableUiState.value.item.playbackId ?: mutableUiState.value.item.id
-        viewModelScope.launch {
+        job?.cancel()
+        job = viewModelScope.launch {
             mutableUiState.update { it.copy(isLoading = true, error = null) }
             try {
                 val detail = if (mutableUiState.value.item.kind == ContentKind.AUDIO) repository.loadAudio(id).value else repository.loadVideo(id).value

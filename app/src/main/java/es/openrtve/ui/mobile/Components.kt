@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -47,6 +48,7 @@ import coil3.compose.AsyncImage
 import es.openrtve.R
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.ContentKind
+import es.openrtve.domain.LiveInfo
 import es.openrtve.domain.RowLayout
 import es.openrtve.domain.imageFor
 import es.openrtve.ui.metaLine
@@ -82,6 +84,7 @@ internal fun ScreenTopBar(
     )
 }
 
+/** Imagen con proporción fija sobre un fondo neutro, recortada con [shape]. */
 @Composable
 internal fun Artwork(
     url: String?,
@@ -196,46 +199,71 @@ internal fun ItemCard(
     rank: Int? = null,
 ) {
     val live = item.live
-    val now = LocalNowMillis.current
-    val context = LocalContext.current
-    val liveProgress = live?.takeIf { it.isOnAir }?.progressAt(now)
     Column(modifier = modifier.clip(CardShape).clickable(onClick = onClick)) {
-        Artwork(item.imageUrl, 16f / 9f, Modifier.fillMaxWidth()) {
-            live?.channelLogoUrl?.let { ChannelLogo(it, Modifier.align(Alignment.TopStart)) }
-            rank?.let { RankBadge(it, Modifier.align(Alignment.BottomStart)) }
-            (progress ?: liveProgress)?.let { ProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
-        }
-        Spacer(Modifier.height(6.dp))
-        when {
-            live == null -> Unit
-            live.isUpcomingAt(now) -> Text(
-                text = listOfNotNull(live.scheduleLabel(context, now), live.category).joinToString(" · "),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            else -> LiveDot()
-        }
-        Text(
-            text = item.title,
-            style = CardTitleStyle,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (live == null || !live.isUpcomingAt(now)) {
-            item.subtitle?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        if (live == null) {
+            Artwork(item.imageUrl, 16f / 9f, Modifier.fillMaxWidth()) {
+                rank?.let { RankBadge(it, Modifier.align(Alignment.BottomStart)) }
+                progress?.let { ProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
             }
+            Spacer(Modifier.height(6.dp))
+            CardTitle(item.title)
+            item.subtitle?.let { CardSubtitle(it) }
+        } else {
+            LiveItemCard(item, live, rank)
         }
         Spacer(Modifier.height(4.dp))
     }
+}
+
+/**
+ * Cuerpo de la tarjeta de un directo. Solo aquí se lee el reloj compartido: así
+ * el tick de 30 s recompone las tarjetas de directos y no todas las demás.
+ */
+@Composable
+private fun ColumnScope.LiveItemCard(item: CatalogItem, live: LiveInfo, rank: Int?) {
+    val now = LocalNowMillis.current
+    val context = LocalContext.current
+    val upcoming = live.isUpcomingAt(now)
+    Artwork(item.imageUrl, 16f / 9f, Modifier.fillMaxWidth()) {
+        live.channelLogoUrl?.let { ChannelLogo(it, Modifier.align(Alignment.TopStart)) }
+        rank?.let { RankBadge(it, Modifier.align(Alignment.BottomStart)) }
+        live.takeIf { it.isOnAir }?.progressAt(now)?.let { ProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
+    }
+    Spacer(Modifier.height(6.dp))
+    if (upcoming) {
+        Text(
+            text = listOfNotNull(live.scheduleLabel(context, now), live.category).joinToString(" · "),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    } else {
+        LiveDot()
+    }
+    CardTitle(item.title)
+    if (!upcoming) item.subtitle?.let { CardSubtitle(it) }
+}
+
+@Composable
+private fun CardTitle(title: String) {
+    Text(
+        text = title,
+        style = CardTitleStyle,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun CardSubtitle(subtitle: String) {
+    Text(
+        text = subtitle,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 /** Número de ranking sobre la esquina de la imagen. */
@@ -357,21 +385,8 @@ internal val CardTitleStyle: TextStyle
 @Composable
 private fun CardCaption(title: String, subtitle: String?) {
     Spacer(Modifier.height(6.dp))
-    Text(
-        text = title,
-        style = CardTitleStyle,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-    )
-    subtitle?.let {
-        Text(
-            text = it,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
+    CardTitle(title)
+    subtitle?.let { CardSubtitle(it) }
     Spacer(Modifier.height(4.dp))
 }
 

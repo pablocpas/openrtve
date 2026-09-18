@@ -7,12 +7,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import kotlinx.coroutines.Dispatchers
 import org.junit.Test
 
 class WatchHistoryLimitsTest {
     private val file = Files.createTempDirectory("openrtve-history").resolve("history.json").toFile()
     private var now = 1_000_000L
-    private val history = WatchHistory(file, nowMillis = { now++ })
+    private val history = WatchHistory(file, nowMillis = { now++ }, ioDispatcher = Dispatchers.Unconfined)
 
     @Test
     fun `only the most recent sixty entries survive`() {
@@ -75,13 +76,13 @@ class WatchHistoryLimitsTest {
         history.register(catalogItem("v1"))
         history.remove("v1")
         assertNull(history.entryFor("v1"))
-        assertTrue(WatchHistory(file).entries.value.isEmpty())
+        assertTrue(WatchHistory(file, ioDispatcher = Dispatchers.Unconfined).entries.value.isEmpty())
 
         file.writeText("{ esto no es json")
-        assertTrue(WatchHistory(file).entries.value.isEmpty())
+        assertTrue(WatchHistory(file, ioDispatcher = Dispatchers.Unconfined).entries.value.isEmpty())
 
         file.writeText("""[{"title":"sin id"},{"id":"ok","title":"Ok","kind":"INVENTADO","positionMs":5}]""")
-        val recovered = WatchHistory(file).entries.value
+        val recovered = WatchHistory(file, ioDispatcher = Dispatchers.Unconfined).entries.value
         assertEquals(listOf("ok"), recovered.map { it.item.id })
         assertEquals("un tipo desconocido se lee como vídeo", ContentKind.VIDEO, recovered.single().item.kind)
     }
@@ -89,6 +90,6 @@ class WatchHistoryLimitsTest {
     @Test
     fun `audio entries keep their kind so the player reopens them as audio`() {
         history.register(catalogItem("a1", kind = ContentKind.AUDIO))
-        assertEquals(ContentKind.AUDIO, WatchHistory(file).entryFor("a1")!!.item.kind)
+        assertEquals(ContentKind.AUDIO, WatchHistory(file, ioDispatcher = Dispatchers.Unconfined).entryFor("a1")!!.item.kind)
     }
 }
