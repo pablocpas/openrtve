@@ -32,7 +32,7 @@ import es.openrtve.R
 import es.openrtve.data.CatalogRepository
 import es.openrtve.domain.ExploreCategory
 import es.openrtve.ui.ExploreViewModel
-import es.openrtve.ui.exploreGroupTitle
+import es.openrtve.ui.header
 import es.openrtve.ui.text
 import androidx.compose.ui.res.stringResource
 
@@ -59,17 +59,20 @@ fun TvExploreScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            state.groups.forEach { group ->
-                item(key = "group-${group.title}", span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        text = exploreGroupTitle(context, group.title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
+            state.groups.forEachIndexed { groupIndex, group ->
+                group.header(context)?.let { title ->
+                    item(key = "group-$groupIndex", span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
                 }
-                itemsIndexed(group.categories, key = { _, it -> it.portadaUrl }) { index, category ->
-                    val focus = if (index == 0 && group == state.groups.first()) Modifier.initialFocus() else Modifier
+                // Una misma portada puede estar en dos grupos (TDP en Temáticas y en Canales).
+                itemsIndexed(group.categories, key = { _, it -> "$groupIndex/${it.contentUrl}" }) { index, category ->
+                    val focus = if (index == 0 && groupIndex == 0) Modifier.initialFocus() else Modifier
                     TvImageTile(category.title, category.imageUrl, { onOpenCategory(category) }, focus.fillMaxWidth())
                 }
             }

@@ -9,7 +9,9 @@ import es.openrtve.domain.CatalogPage
 import es.openrtve.domain.ContentKind
 import es.openrtve.domain.ExploreGroup
 import es.openrtve.domain.HomeFeed
+import es.openrtve.domain.HomeLink
 import es.openrtve.domain.HomeRow
+import es.openrtve.domain.LinkKind
 import es.openrtve.domain.PreviewSprite
 import es.openrtve.domain.ProgramDetail
 import es.openrtve.domain.QuickFilter
@@ -132,6 +134,26 @@ class PortadaViewModelTest {
         assertEquals(listOf(0, 2), sections.map { it.row.id })
         assertEquals("Lo más destacado", sections[0].title)
         assertEquals(SectionState.Failed(LoadError.Unknown), sections[1].state)
+    }
+
+    @Test
+    fun `a links row is ready with the feed and never fetched`() = runTest(dispatcher) {
+        val viewModel = PortadaViewModel(repository, URL)
+        val links = listOf(HomeLink("Series para maratón", null, "https://api.rtve.es/api/collection/1900.json", LinkKind.COLLECTION))
+        val base = feed("TV", rows = 1)
+        val linksRow = HomeRow(id = 1, title = "Enlaces", order = 1, moduleType = "catalogs", presentation = "links", contentUrl = null, links = links)
+        repository.feed.complete(base.copy(value = base.value.copy(rows = base.value.rows + linksRow)))
+        dispatcher.scheduler.runCurrent()
+
+        val sections = viewModel.uiState.value.sections
+        assertEquals(listOf(0, 1), sections.map { it.row.id })
+        assertEquals(SectionState.Links(links), sections[1].state)
+        assertTrue(sections[0].state is SectionState.Loading)
+        // Solo la fila con fuente remota se pide; la de enlaces no tiene nada que cargar.
+        repository.modules.getValue(0).complete(module(items = 1))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(SectionState.Links(links), viewModel.uiState.value.sections[1].state)
+        assertFalse(repository.modules.getValue(1).isCompleted)
     }
 
     private fun feed(title: String, rows: Int) = CatalogLoad(

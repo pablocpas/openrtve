@@ -29,10 +29,12 @@ import es.openrtve.R
 import es.openrtve.domain.BlockReason
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.ContentKind
+import es.openrtve.domain.referenceItem
 import es.openrtve.domain.PlaybackDecision
 import es.openrtve.domain.RtveUrls
 import es.openrtve.playback.PlayerActivity
 import es.openrtve.ui.Destination
+import es.openrtve.ui.destination
 import es.openrtve.ui.NavigationViewModel
 import es.openrtve.ui.Tab
 import es.openrtve.ui.UiMessage
@@ -149,6 +151,7 @@ fun MobileApp(
                     onBack = navigation::pop,
                     onOpenItem = openItem,
                     onOpenRow = { row, title -> navigation.push(Destination.Module(row, title)) },
+                        onOpenLink = { link -> link.destination()?.let(navigation::push) },
                     onError = showError,
                 )
                 is Destination.Module -> ModuleScreen(
@@ -178,7 +181,7 @@ fun MobileApp(
                     item = destination.item,
                     onBack = navigation::pop,
                     onPlay = play,
-                    onOpenProgram = { id, title -> navigation.push(Destination.Program(programStub(id, title))) },
+                    onOpenProgram = { id, title -> navigation.push(Destination.Program(referenceItem(id, ContentKind.PROGRAM, title))) },
                     onError = showError,
                 )
                 null -> when (nav.tab) {
@@ -190,6 +193,7 @@ fun MobileApp(
                         onBack = null,
                         onOpenItem = openItem,
                         onOpenRow = { row, title -> navigation.push(Destination.Module(row, title)) },
+                        onOpenLink = { link -> link.destination()?.let(navigation::push) },
                         onError = showError,
                         onOpenSettings = { navigation.push(Destination.Settings) },
                     )
@@ -200,7 +204,7 @@ fun MobileApp(
                     )
                     Tab.EXPLORE -> ExploreScreen(
                         repository = repository,
-                        onOpenCategory = { navigation.push(Destination.Portada(it.portadaUrl, it.title)) },
+                        onOpenCategory = { navigation.push(it.destination()) },
                         onOpenSettings = { navigation.push(Destination.Settings) },
                     )
                 }
@@ -209,20 +213,3 @@ fun MobileApp(
     }
     }
 }
-
-/** Ficha mínima para abrir un programa del que solo conocemos id y nombre. */
-private fun programStub(id: String, title: String) = CatalogItem(
-    id = id,
-    playbackId = null,
-    assetId = null,
-    title = title,
-    subtitle = null,
-    imageUrl = null,
-    kind = ContentKind.PROGRAM,
-    directQualityUrl = null,
-    allowedInCountry = null,
-    loginRequired = false,
-    paid = false,
-    drm = false,
-    programId = id,
-)

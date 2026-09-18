@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -75,19 +75,20 @@ fun ModuleScreen(
 
 @Composable
 internal fun ItemGrid(items: List<CatalogItem>, layout: RowLayout, onOpenItem: (CatalogItem) -> Unit) {
-    val poster = layout == RowLayout.POSTER
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = if (poster) 110.dp else 160.dp),
+        columns = GridCells.Adaptive(minSize = if (layout.isVertical) 110.dp else 160.dp),
         contentPadding = PaddingValues(ScreenPadding),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        items(items, key = { it.id }) { item ->
-            when {
-                poster -> PosterCard(item, { onOpenItem(item) })
-                layout == RowLayout.SQUARE -> SquareCard(item, { onOpenItem(item) })
-                else -> ItemCard(item, { onOpenItem(item) })
+        itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
+            when (val gridLayout = layout.gridLayout) {
+                RowLayout.POSTER -> PosterCard(item, { onOpenItem(item) })
+                RowLayout.POSTER_TALL -> TallPosterCard(item, { onOpenItem(item) })
+                RowLayout.SQUARE -> SquareCard(item, { onOpenItem(item) })
+                RowLayout.RANKED -> ItemCard(item, { onOpenItem(item) }, rank = index + 1)
+                RowLayout.LANDSCAPE, RowLayout.HERO, RowLayout.FEATURED -> ItemCard(item, { onOpenItem(item) })
             }
         }
     }

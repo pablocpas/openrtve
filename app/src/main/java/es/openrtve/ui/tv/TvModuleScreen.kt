@@ -62,7 +62,7 @@ fun TvModuleScreen(
 @Composable
 internal fun TvItemGrid(items: List<CatalogItem>, layout: RowLayout, onOpenItem: (CatalogItem) -> Unit) {
     // En rejilla el hero no tiene sentido: se degrada a apaisada.
-    val gridLayout = if (layout == RowLayout.HERO) RowLayout.LANDSCAPE else layout
+    val gridLayout = layout.gridLayout
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = gridLayout.cardWidth()),
         contentPadding = PaddingValues(start = TvHorizontalMargin, end = TvHorizontalMargin, bottom = TvVerticalMargin),
@@ -71,7 +71,13 @@ internal fun TvItemGrid(items: List<CatalogItem>, layout: RowLayout, onOpenItem:
         modifier = Modifier.fillMaxSize(),
     ) {
         itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
-            TvItemCard(item, gridLayout, { onOpenItem(item) }, if (index == 0) Modifier.initialFocus() else Modifier)
+            TvItemCard(
+                item,
+                gridLayout,
+                { onOpenItem(item) },
+                if (index == 0) Modifier.initialFocus() else Modifier,
+                rank = (index + 1).takeIf { gridLayout == RowLayout.RANKED },
+            )
         }
     }
 }

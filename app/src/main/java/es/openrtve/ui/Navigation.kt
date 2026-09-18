@@ -3,7 +3,14 @@ package es.openrtve.ui
 import androidx.lifecycle.ViewModel
 import es.openrtve.domain.BlockReason
 import es.openrtve.domain.CatalogItem
+import es.openrtve.domain.ContentKind
+import es.openrtve.domain.ExploreCategory
+import es.openrtve.domain.HomeLink
 import es.openrtve.domain.HomeRow
+import es.openrtve.domain.LinkKind
+import es.openrtve.domain.collectionRow
+import es.openrtve.domain.liveRow
+import es.openrtve.domain.referenceItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +25,22 @@ sealed interface Destination {
     data class Program(val item: CatalogItem) : Destination
     data class Video(val item: CatalogItem) : Destination
     data object Settings : Destination
+}
+
+/** Una categoría abre su portada; un canal temático, la lista con su directo. */
+fun ExploreCategory.destination(): Destination =
+    if (isLive) Destination.Module(liveRow(contentUrl, title), title) else Destination.Portada(contentUrl, title)
+
+/**
+ * Destino de un enlace de portada. Programa, vídeo y audio necesitan el id de su
+ * URL de API; si no se reconoce, el enlace no lleva a ningún sitio.
+ */
+fun HomeLink.destination(): Destination? = when (kind) {
+    LinkKind.COLLECTION -> Destination.Module(collectionRow(url, title), title)
+    LinkKind.PORTADA -> Destination.Portada(url, title)
+    LinkKind.PROGRAM -> apiId?.let { Destination.Program(referenceItem(it, ContentKind.PROGRAM, title, imageUrl)) }
+    LinkKind.VIDEO -> apiId?.let { Destination.Video(referenceItem(it, ContentKind.VIDEO, title, imageUrl)) }
+    LinkKind.AUDIO -> apiId?.let { Destination.Video(referenceItem(it, ContentKind.AUDIO, title, imageUrl)) }
 }
 
 /** Mensajes efímeros que la UI muestra una vez y descarta. */

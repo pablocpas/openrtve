@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Settings
@@ -63,6 +64,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import es.openrtve.domain.CatalogItem
+import es.openrtve.domain.HomeLink
 import es.openrtve.domain.HomeRow
 import es.openrtve.domain.RowLayout
 import es.openrtve.ui.HomeSection
@@ -87,6 +89,7 @@ fun PortadaScreen(
     onError: (String) -> Unit,
     onOpenSettings: (() -> Unit)? = null,
     history: WatchHistory? = null,
+    onOpenLink: (HomeLink) -> Unit = {},
 ) {
     val viewModel: PortadaViewModel = viewModel(
         key = "portada-$url",
@@ -160,6 +163,7 @@ fun PortadaScreen(
                             section = section,
                             fullBleedHero = isRoot && section.row.id == state.sections.first().row.id,
                             onOpenItem = onOpenItem,
+                            onOpenLink = onOpenLink,
                             onSeeAll = { onOpenRow(section.row, section.title) },
                             onRetry = { viewModel.retrySection(section.row) },
                             // Como en Findroid: si una fila cambia de alto, las de debajo se desplazan animadas.
@@ -254,12 +258,14 @@ private fun SectionView(
     section: HomeSection,
     fullBleedHero: Boolean,
     onOpenItem: (CatalogItem) -> Unit,
+    onOpenLink: (HomeLink) -> Unit,
     onSeeAll: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val layout = section.row.layout
+    val isLinks = section.state is SectionState.Links
     Column(modifier) {
         // El hero no lleva cabecera: la imagen y el título ya son la cabecera.
         if (layout != RowLayout.HERO && section.title.isNotBlank()) {
@@ -277,13 +283,24 @@ private fun SectionView(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = onSeeAll) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = stringResource(R.string.action_see_all))
+                // Los enlaces ya están todos en la fila: no hay "ver todo".
+                if (!isLinks) {
+                    IconButton(onClick = onSeeAll) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = stringResource(R.string.action_see_all))
+                    }
                 }
             }
         }
         when (val state = section.state) {
             SectionState.Loading -> PlaceholderRow(layout, fullBleedHero)
+            is SectionState.Links -> LazyRow(
+                contentPadding = PaddingValues(horizontal = ScreenPadding),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(state.links, key = { it.url }) { link ->
+                    ImageTile(link.title, link.imageUrl, { onOpenLink(link) }, Modifier.width(LandscapeWidth))
+                }
+            }
             is SectionState.Failed -> Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(horizontal = ScreenPadding),
@@ -298,15 +315,20 @@ private fun SectionView(
             }
             is SectionState.Loaded -> when (layout) {
                 RowLayout.HERO -> HeroPager(state.items, onOpenItem, fullBleed = fullBleedHero)
+                RowLayout.FEATURED -> state.items.firstOrNull()?.let { item ->
+                    FeaturedCard(item, { onOpenItem(item) }, Modifier.padding(horizontal = ScreenPadding).fillMaxWidth())
+                }
                 else -> LazyRow(
                     contentPadding = PaddingValues(horizontal = ScreenPadding),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(state.items, key = { it.id }) { item ->
+                    itemsIndexed(state.items, key = { _, it -> it.id }) { index, item ->
                         when (layout) {
                             RowLayout.POSTER -> PosterCard(item, { onOpenItem(item) }, Modifier.width(PosterWidth))
+                            RowLayout.POSTER_TALL -> TallPosterCard(item, { onOpenItem(item) }, Modifier.width(PosterWidth))
                             RowLayout.SQUARE -> SquareCard(item, { onOpenItem(item) }, Modifier.width(SquareWidth))
-                            else -> ItemCard(item, { onOpenItem(item) }, Modifier.width(LandscapeWidth))
+                            RowLayout.RANKED -> ItemCard(item, { onOpenItem(item) }, Modifier.width(LandscapeWidth), rank = index + 1)
+                            RowLayout.LANDSCAPE, RowLayout.HERO, RowLayout.FEATURED -> ItemCard(item, { onOpenItem(item) }, Modifier.width(LandscapeWidth))
                         }
                     }
                 }
@@ -317,21 +339,24 @@ private fun SectionView(
 
 @Composable
 private fun PlaceholderRow(layout: RowLayout, fullBleedHero: Boolean) {
-    if (layout == RowLayout.HERO) {
+    // Los dos destacados ocupan el ancho; solo el hero de cabecera va a sangre.
+    if (layout == RowLayout.HERO || layout == RowLayout.FEATURED) {
+        val fullBleed = fullBleedHero && layout == RowLayout.HERO
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = if (fullBleedHero) 0.dp else ScreenPadding)
-                .aspectRatio(if (fullBleedHero) 4f / 3f else 16f / 9f)
-                .clip(if (fullBleedHero) androidx.compose.foundation.shape.RoundedCornerShape(0.dp) else CardShape)
+                .padding(horizontal = if (fullBleed) 0.dp else ScreenPadding)
+                .aspectRatio(if (fullBleed) 4f / 3f else 16f / 9f)
+                .clip(if (fullBleed) androidx.compose.foundation.shape.RoundedCornerShape(0.dp) else CardShape)
                 .background(MaterialTheme.colorScheme.surface),
         )
         return
     }
     val (width, ratio) = when (layout) {
         RowLayout.POSTER -> Pair(PosterWidth, 2f / 3f)
+        RowLayout.POSTER_TALL -> Pair(PosterWidth, 1f / 2f)
         RowLayout.SQUARE -> Pair(SquareWidth, 1f)
-        else -> Pair(LandscapeWidth, 16f / 9f)
+        RowLayout.LANDSCAPE, RowLayout.RANKED, RowLayout.HERO, RowLayout.FEATURED -> Pair(LandscapeWidth, 16f / 9f)
     }
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),

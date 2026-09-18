@@ -38,10 +38,12 @@ import es.openrtve.R
 import es.openrtve.domain.BlockReason
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.ContentKind
+import es.openrtve.domain.referenceItem
 import es.openrtve.domain.PlaybackDecision
 import es.openrtve.domain.RtveUrls
 import es.openrtve.playback.PlayerActivity
 import es.openrtve.ui.Destination
+import es.openrtve.ui.destination
 import es.openrtve.ui.NavigationViewModel
 import es.openrtve.ui.Tab
 import es.openrtve.ui.UiMessage
@@ -133,6 +135,7 @@ fun TvApp(container: AppContainer) {
                     title = destination.title,
                     onOpenItem = openItem,
                     onOpenRow = { row, title -> navigation.push(Destination.Module(row, title)) },
+                        onOpenLink = { link -> link.destination()?.let(navigation::push) },
                     onError = showError,
                 )
                 is Destination.Module -> TvModuleScreen(
@@ -154,7 +157,7 @@ fun TvApp(container: AppContainer) {
                     history = container.watchHistory,
                     item = destination.item,
                     onPlay = play,
-                    onOpenProgram = { id, title -> navigation.push(Destination.Program(programStub(id, title))) },
+                    onOpenProgram = { id, title -> navigation.push(Destination.Program(referenceItem(id, ContentKind.PROGRAM, title))) },
                     onError = showError,
                 )
                 Destination.Settings -> TvSettingsScreen(container, onMessage = showError)
@@ -166,11 +169,12 @@ fun TvApp(container: AppContainer) {
                         history = container.watchHistory,
                         onOpenItem = openItem,
                         onOpenRow = { row, title -> navigation.push(Destination.Module(row, title)) },
+                        onOpenLink = { link -> link.destination()?.let(navigation::push) },
                         onError = showError,
                     )
                     Tab.SEARCH -> TvSearchScreen(repository, openItem, showError)
                     Tab.EXPLORE -> TvExploreScreen(repository) {
-                        navigation.push(Destination.Portada(it.portadaUrl, it.title))
+                        navigation.push(it.destination())
                     }
                 }
             }
@@ -203,19 +207,3 @@ private fun NavigationDrawerScope.DrawerEntry(icon: ImageVector, label: String, 
 }
 
 private const val MESSAGE_VISIBLE_MS = 4_000L
-
-private fun programStub(id: String, title: String) = CatalogItem(
-    id = id,
-    playbackId = null,
-    assetId = null,
-    title = title,
-    subtitle = null,
-    imageUrl = null,
-    kind = ContentKind.PROGRAM,
-    directQualityUrl = null,
-    allowedInCountry = null,
-    loginRequired = false,
-    paid = false,
-    drm = false,
-    programId = id,
-)

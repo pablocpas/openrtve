@@ -28,13 +28,12 @@
     <string name="settings_version">Versión %1$s</string>
     <string name="settings_about_summary">Cliente independiente para el catálogo público de RTVE Play. No está afiliado a RTVE.</string>
 
-    <string name="explore_topics">Temáticas</string>
     <string name="explore_kids">Infantil</string>
-    <string name="explore_radio">Radio y pódcasts</string>
 
     <string name="action_back">Atrás</string>
     <string name="action_retry">Reintentar</string>
     <string name="action_see_all">Ver todo</string>
+    <string name="action_watch_now">Ver ahora</string>
 
     <string name="state_loading">Cargando…</string>
     <string name="state_stale">Mostrando la última copia disponible</string>

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import es.openrtve.data.CatalogRepository
 import es.openrtve.domain.CatalogItem
+import es.openrtve.domain.HomeLink
 import es.openrtve.domain.HomeRow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -21,8 +22,13 @@ import kotlinx.coroutines.sync.withPermit
 sealed interface SectionState {
     data object Loading : SectionState
     data class Loaded(val items: List<CatalogItem>, val isStale: Boolean) : SectionState
+    /** Fila `links`: sus accesos llegan con la portada, sin carga propia. */
+    data class Links(val links: List<HomeLink>) : SectionState
     data class Failed(val error: LoadError) : SectionState
 }
+
+/** Estado inicial de una fila: los enlaces ya están; el resto se carga. */
+private fun HomeRow.initialSection() = HomeSection(this, if (isInline) SectionState.Links(links) else SectionState.Loading)
 
 data class HomeSection(
     val row: HomeRow,
@@ -124,22 +130,21 @@ class PortadaViewModel(
                 return@launch
             }
 
-            val rows = feed.value.rows.filter { it.contentUrl != null }
+            val rows = feed.value.rows.filter { it.isRenderable }
             lastLoadedAtMillis = System.currentTimeMillis()
             mutableUiState.update { ui ->
-                val previous = ui.sections.associateBy { it.row.contentUrl }
+                // Las filas remotas que ya estaban conservan su contenido mientras se revalidan;
+                // las inline vienen completas en el feed nuevo.
+                val previous = ui.sections.filter { !it.row.isInline }.associateBy { it.row.contentUrl }
                 ui.copy(
                     title = feed.value.title.trim(),
-                    // Las filas que ya estaban conservan su contenido mientras se revalidan.
-                    sections = rows.map { row ->
-                        previous[row.contentUrl]?.copy(row = row) ?: HomeSection(row, SectionState.Loading)
-                    },
+                    sections = rows.map { row -> previous[row.contentUrl]?.copy(row = row) ?: row.initialSection() },
                     isLoading = false,
                     isRefreshing = false,
                     isFeedStale = feed.isStale,
                 )
             }
-            rows.forEach { row -> scope.launch { loadSection(row, forceRefresh) } }
+            rows.filter { !it.isInline }.forEach { row -> scope.launch { loadSection(row, forceRefresh) } }
         }
     }
 
@@ -151,15 +156,15 @@ class PortadaViewModel(
         } catch (_: Exception) {
             return
         }
-        val rows = cached.value.rows.filter { it.contentUrl != null }
+        val rows = cached.value.rows.filter { it.isRenderable }
         mutableUiState.update {
             it.copy(
                 title = cached.value.title.trim(),
-                sections = rows.map { row -> HomeSection(row, SectionState.Loading) },
+                sections = rows.map(HomeRow::initialSection),
                 isLoading = false,
             )
         }
-        rows.forEach { row ->
+        rows.filter { !it.isInline }.forEach { row ->
             scope.launch {
                 val module = try {
                     repository.loadModule(row, cachedOnly = true)

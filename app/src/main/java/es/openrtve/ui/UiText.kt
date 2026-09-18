@@ -4,6 +4,7 @@ import android.content.Context
 import es.openrtve.R
 import es.openrtve.domain.BlockReason
 import es.openrtve.domain.CatalogItem
+import es.openrtve.domain.ExploreGroup
 import es.openrtve.domain.LiveInfo
 import es.openrtve.domain.VideoDetail
 
@@ -55,12 +56,13 @@ fun CatalogItem.metaLine(context: Context): String? = listOfNotNull(
     durationMs?.takeIf { it > 0 }?.let { context.getString(R.string.meta_minutes, (it / 60_000L).toInt()) },
 ).takeIf { it.isNotEmpty() }?.joinToString(" · ")
 
-/** Los bloques del menú oficial tienen nombres internos ("Bloque de contenidos"). */
-fun exploreGroupTitle(context: Context, raw: String): String = when {
-    raw.contains("infantil", ignoreCase = true) -> context.getString(R.string.explore_kids)
-    raw.equals("Radio", ignoreCase = true) -> context.getString(R.string.explore_radio)
-    else -> context.getString(R.string.explore_topics)
-}
+/**
+ * Cabecera de un grupo de Explorar, o `null` si no lleva: el menú oficial es plano y
+ * el bloque principal se lista sin título; el infantil se nombra y los submenús
+ * traen título editorial.
+ */
+fun ExploreGroup.header(context: Context): String? =
+    if (isKids) context.getString(R.string.explore_kids) else title
 
 /** "2018 · 108 min · No recomendable para menores de 12 años", omitiendo lo que falte. */
 fun VideoDetail.metaLine(context: Context): String? = listOfNotNull(
