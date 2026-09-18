@@ -3,11 +3,11 @@ package es.openrtve.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import es.openrtve.data.CatalogRepository
-import es.openrtve.data.HttpStatusException
 import es.openrtve.domain.CatalogItem
+import es.openrtve.domain.EpisodeOrder
+import es.openrtve.domain.episodeOrder
+import es.openrtve.domain.isFirstSeason
 import es.openrtve.domain.ProgramDetail
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +26,8 @@ data class ProgramUiState(
     val totalPages: Int = 0,
     /** El programa no tiene contenidos completos y se muestran sus fragmentos. */
     val showingClips: Boolean = false,
+    /** Sentido de [episodes]: el de RTVE Play para este programa y temporada. */
+    val order: EpisodeOrder = EpisodeOrder.NEWEST_FIRST,
     val isLoading: Boolean = true,
     val isLoadingMore: Boolean = false,
     val isStale: Boolean = false,
@@ -70,8 +72,12 @@ class ProgramViewModel(
     /** De dónde salió la primera página; las siguientes van a la misma fuente aunque el programa sea de radio. */
     private var episodesFromAudios = false
 
-    private suspend fun loadPage(programId: String, seasonId: String?, page: Int, completeOnly: Boolean, fromAudios: Boolean) =
-        if (fromAudios) repository.loadProgramAudios(programId, page) else repository.loadProgramVideos(programId, seasonId, page, completeOnly)
+    private suspend fun loadPage(programId: String, seasonId: String?, page: Int, completeOnly: Boolean, order: EpisodeOrder, fromAudios: Boolean) =
+        if (fromAudios) repository.loadProgramAudios(programId, page) else repository.loadProgramVideos(programId, seasonId, page, completeOnly, order)
+
+    /** Sin ficha no hay regla: del más nuevo al más antiguo, como los feeds. */
+    private fun orderFor(seasonId: String?): EpisodeOrder =
+        mutableUiState.value.detail?.let { it.episodeOrder(isFirstSeason = it.isFirstSeason(seasonId)) } ?: EpisodeOrder.NEWEST_FIRST
 
     fun selectSeason(seasonId: String?) {
         if (seasonId == mutableUiState.value.selectedSeasonId) return
@@ -85,7 +91,7 @@ class ProgramViewModel(
         episodesJob = viewModelScope.launch {
             mutableUiState.update { it.copy(isLoadingMore = true) }
             try {
-                val result = loadPage(state.programId, state.selectedSeasonId, state.page + 1, completeOnly = !state.showingClips, fromAudios = episodesFromAudios)
+                val result = loadPage(state.programId, state.selectedSeasonId, state.page + 1, completeOnly = !state.showingClips, order = state.order, fromAudios = episodesFromAudios)
                 mutableUiState.update {
                     it.copy(
                         episodes = (it.episodes + result.value.items).distinctBy(CatalogItem::id),
@@ -118,18 +124,19 @@ class ProgramViewModel(
             mutableUiState.update { it.copy(isLoading = true, error = null) }
             val programId = mutableUiState.value.programId
             val seasonId = mutableUiState.value.selectedSeasonId
+            val order = orderFor(seasonId)
             try {
                 var showingClips = false
                 var fromAudios = isRadio
-                var result = loadPage(programId, seasonId, page = 1, completeOnly = true, fromAudios = fromAudios)
+                var result = loadPage(programId, seasonId, page = 1, completeOnly = true, order = order, fromAudios = fromAudios)
                 if (result.value.items.isEmpty() && !isRadio) {
                     // Programas de clips (titulares, deportes...) no tienen "Completo".
-                    result = repository.loadProgramVideos(programId, seasonId, page = 1, completeOnly = false)
+                    result = repository.loadProgramVideos(programId, seasonId, page = 1, completeOnly = false, order = order)
                     showingClips = result.value.items.isNotEmpty()
                 }
                 if (result.value.items.isEmpty() && isRadio) {
                     // Algún programa de radio publica videopódcasts en vez de audios.
-                    result = repository.loadProgramVideos(programId, seasonId, page = 1, completeOnly = false)
+                    result = repository.loadProgramVideos(programId, seasonId, page = 1, completeOnly = false, order = order)
                     fromAudios = false
                 }
                 episodesFromAudios = fromAudios
@@ -139,6 +146,7 @@ class ProgramViewModel(
                         page = result.value.page,
                         totalPages = result.value.totalPages,
                         showingClips = showingClips,
+                        order = order,
                         isLoading = false,
                         isStale = it.isStale || result.isStale,
                     )
@@ -149,12 +157,5 @@ class ProgramViewModel(
                 mutableUiState.update { it.copy(isLoading = false, error = error.toLoadError()) }
             }
         }
-    }
-
-    private fun Throwable.toLoadError(): LoadError = when (this) {
-        is UnknownHostException -> LoadError.Offline
-        is SocketTimeoutException -> LoadError.Timeout
-        is HttpStatusException -> LoadError.Http(statusCode)
-        else -> LoadError.Unknown
     }
 }

@@ -84,6 +84,15 @@ enum class RowLayout {
             HERO, FEATURED, SQUARE, LANDSCAPE, RANKED -> false
         }
 
+    /** Proporción ancho/alto de la imagen de cada tarjeta. */
+    val aspectRatio: Float
+        get() = when (this) {
+            HERO, FEATURED, LANDSCAPE, RANKED -> 16f / 9f
+            POSTER -> 2f / 3f
+            POSTER_TALL -> 1f / 2f
+            SQUARE -> 1f
+        }
+
     /** En rejilla los destacados no tienen sentido: se degradan a apaisada. */
     val gridLayout: RowLayout
         get() = when (this) {
@@ -237,6 +246,8 @@ data class ProgramSeason(
     val id: String,
     val title: String,
     val episodeCount: Int?,
+    /** Posición editorial (`orden`); decide el orden de las pestañas. */
+    val order: Int? = null,
 )
 
 data class ProgramDetail(
@@ -246,10 +257,17 @@ data class ProgramDetail(
     val description: String?,
     val imageUrl: String?,
     val emission: String?,
+    /** Ya en el orden en que se muestran (ver [seasonsInDisplayOrder]). */
     val seasons: List<ProgramSeason>,
     val webUrl: String? = null,
     /** Programa de radio: sus episodios están en `audios.json`. */
     val isRadio: Boolean = false,
+    /** `programTypeID` del feed ("136519" = Series Prime Time...); falta en muchos programas antiguos. */
+    val programTypeId: String? = null,
+    /** `outOfEmission == false`: sigue publicando episodios. */
+    val inEmission: Boolean = true,
+    /** `isComplete`: la serie está completa en el catálogo. */
+    val isComplete: Boolean = false,
 )
 
 data class CatalogLoad<T>(

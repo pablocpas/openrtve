@@ -246,7 +246,12 @@ class RtveJsonParserTest {
               "id":"178291","name":"La amiga estupenda","contentType":"programa",
               "description":"<p>Elena y Lila</p>","emission":"Sábado a las 22:00",
               "imgPortada":"https://img.rtve.es/imagenes/x.jpg",
-              "seasons":[{"shorttitle":"T1","longTitle":"Temporada 1","id":1000013,"orden":1,"numEpisodes":8}]
+              "programTypeID":136519,"outOfEmission":false,"isComplete":false,
+              "seasons":[
+                {"shorttitle":"T1","longTitle":"Temporada 1","id":1000013,"orden":1,"numEpisodes":8},
+                {"shorttitle":"T2","longTitle":"Temporada 2","id":1000014,"orden":2,"numEpisodes":6},
+                {"shorttitle":"T3","longTitle":"Temporada 3","id":1000015,"orden":3,"numEpisodes":0}
+              ]
             }]}}
             """.trimIndent(),
         )
@@ -254,8 +259,13 @@ class RtveJsonParserTest {
         assertEquals("La amiga estupenda", detail.title)
         assertEquals("Sábado a las 22:00", detail.emission)
         assertEquals("https://img.rtve.es/imagenes/x.jpg", detail.imageUrl)
-        assertEquals(listOf("1000013"), detail.seasons.map { it.id })
-        assertEquals(8, detail.seasons.single().episodeCount)
+        assertEquals("136519", detail.programTypeId)
+        assertTrue(detail.inEmission)
+        assertFalse(detail.isComplete)
+        // En emisión: la temporada más reciente primero; sin episodios no se lista.
+        assertEquals(listOf("1000014", "1000013"), detail.seasons.map { it.id })
+        assertEquals(6, detail.seasons.first().episodeCount)
+        assertEquals(2, detail.seasons.first().order)
     }
 
     @Test
@@ -355,6 +365,25 @@ class RtveJsonParserTest {
         assertEquals("Vuelta a España", result[0].subtitle)
         assertEquals("https://img.rtve.es/v/1/horizontal2?w=960", result[0].imageUrl)
         assertEquals("Telediario", result[2].title)
+    }
+
+    @Test
+    fun `an item without its own id is the media it wraps, not a program`() {
+        // Visto en "Descubre las novedades de la temporada": solo `contentType` y `lastMultimedia`.
+        val result = parser.parseModule(
+            raw = """
+                {"page":{"items":[{"id":1,"collectionItems":[
+                  {"contentType":"video","lastMultimedia":{"id":"17208098","title":"'Flash Moda' o 'Cervantes por el mundo', novedades de La 2","contentType":"video","programInfo":{"id":"40110","title":"Otros programas"}}},
+                  {"id":"56811","name":"Flash moda","contentType":"video","lastMultimedia":{"id":"9","title":"Adolfo Domínguez","contentType":"video"}}
+                ]}]}}
+            """.trimIndent(),
+            fallbackTitle = "",
+        ).items
+
+        assertEquals(listOf("17208098", "56811"), result.map { it.id })
+        assertEquals(listOf(ContentKind.VIDEO, ContentKind.PROGRAM), result.map { it.kind })
+        assertEquals("40110", result[0].programId)
+        assertEquals("17208098", result[0].playbackId)
     }
 
     @Test

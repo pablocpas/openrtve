@@ -1,6 +1,5 @@
 package es.openrtve.ui.mobile
 
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +28,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,10 +46,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
@@ -59,10 +53,10 @@ import es.openrtve.data.WatchHistory
 import androidx.compose.ui.draw.clip
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.VideoDetail
-import es.openrtve.ui.VideoViewModel
 import es.openrtve.ui.feedDateToDisplay
+import es.openrtve.ui.rememberVideoScreen
+import es.openrtve.ui.shareLink
 import es.openrtve.ui.metaLine
-import es.openrtve.ui.text
 
 /**
  * Ficha de vídeo/película como la `MovieScreen` de Findroid: fondo con paralaje y
@@ -78,23 +72,11 @@ fun VideoScreen(
     onOpenProgram: (programId: String, title: String) -> Unit,
     onError: (String) -> Unit,
 ) {
-    val viewModel: VideoViewModel = viewModel(
-        key = "video-${item.id}",
-        factory = viewModelFactory { initializer { VideoViewModel(repository, item) } },
-    )
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val screen = rememberVideoScreen(repository, history, item, onError)
+    val state = screen.state
+    val resume = screen.resume
     val context = LocalContext.current
     val scrollState = rememberScrollState()
-    val historyEntries by history.entries.collectAsStateWithLifecycle()
-    val resume = remember(historyEntries, state.item.id) { history.entryFor(state.item.id)?.takeIf { it.inProgress } }
-
-    state.error?.let { error ->
-        val text = error.text(context)
-        LaunchedEffect(error) {
-            onError(text)
-            viewModel.dismissError()
-        }
-    }
 
     val detail = state.detail
     Box(Modifier.fillMaxSize()) {
@@ -154,7 +136,7 @@ fun VideoScreen(
                         }
                     }
                     detail?.webUrl?.let { url ->
-                        FilledTonalIconButton(onClick = { context.share(state.item.title, url) }) {
+                        FilledTonalIconButton(onClick = { context.shareLink(state.item.title, url) }) {
                             Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.action_share))
                         }
                     }
@@ -218,7 +200,7 @@ private fun DetailBody(detail: VideoDetail) {
         detail.description?.let { html ->
             var expanded by remember { mutableStateOf(false) }
             Text(
-                text = AnnotatedString.fromHtml(html),
+                text = remember(html) { AnnotatedString.fromHtml(html) },
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = if (expanded) Int.MAX_VALUE else 4,
                 overflow = TextOverflow.Ellipsis,
@@ -258,14 +240,5 @@ private fun InfoLine(label: String, value: String?) {
 
 private fun languageName(code: String): String =
     java.util.Locale(code).getDisplayLanguage(java.util.Locale("es")).replaceFirstChar { it.uppercase() }
-
-private fun android.content.Context.share(title: String, url: String) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, title)
-        putExtra(Intent.EXTRA_TEXT, url)
-    }
-    startActivity(Intent.createChooser(intent, title))
-}
 
 private val BackdropHeight = 288.dp

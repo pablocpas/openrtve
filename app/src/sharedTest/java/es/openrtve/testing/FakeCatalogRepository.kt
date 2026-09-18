@@ -5,6 +5,7 @@ import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.CatalogLoad
 import es.openrtve.domain.CatalogModule
 import es.openrtve.domain.CatalogPage
+import es.openrtve.domain.EpisodeOrder
 import es.openrtve.domain.ContentKind
 import es.openrtve.domain.ExploreGroup
 import es.openrtve.domain.HomeFeed
@@ -104,9 +105,10 @@ open class FakeCatalogRepository : CatalogRepository {
         seasonId: String?,
         page: Int,
         completeOnly: Boolean,
+        order: EpisodeOrder,
         forceRefresh: Boolean,
     ): CatalogLoad<CatalogPage> {
-        calls += "programVideos($programId, season=$seasonId, page=$page, complete=$completeOnly)"
+        calls += "programVideos($programId, season=$seasonId, page=$page, complete=$completeOnly, order=${order.name})"
         return programVideos(programId, seasonId, page, completeOnly, forceRefresh)
     }
 

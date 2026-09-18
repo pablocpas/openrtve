@@ -6,6 +6,7 @@ import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.CatalogLoad
 import es.openrtve.domain.CatalogModule
 import es.openrtve.domain.CatalogPage
+import es.openrtve.domain.EpisodeOrder
 import es.openrtve.domain.ContentKind
 import es.openrtve.domain.ExploreGroup
 import es.openrtve.domain.HomeFeed
@@ -219,7 +220,7 @@ class PortadaViewModelTest {
         override suspend fun loadProgramAudios(programId: String, page: Int, forceRefresh: Boolean): CatalogLoad<CatalogPage> = throw UnsupportedOperationException()
         override suspend fun loadNextVideo(videoId: String): CatalogItem? = null
         override suspend fun loadPreviewSprite(videoId: String): PreviewSprite? = null
-        override suspend fun loadProgramVideos(programId: String, seasonId: String?, page: Int, completeOnly: Boolean, forceRefresh: Boolean): CatalogLoad<CatalogPage> = throw UnsupportedOperationException()
+        override suspend fun loadProgramVideos(programId: String, seasonId: String?, page: Int, completeOnly: Boolean, order: EpisodeOrder, forceRefresh: Boolean): CatalogLoad<CatalogPage> = throw UnsupportedOperationException()
     }
 
     private companion object {

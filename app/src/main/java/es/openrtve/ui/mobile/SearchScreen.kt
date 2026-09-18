@@ -28,8 +28,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -37,15 +35,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.RowLayout
-import es.openrtve.ui.SearchViewModel
+import es.openrtve.ui.FilterState
+import es.openrtve.ui.rememberSearchScreen
 import es.openrtve.ui.text
 
 /** Buscador: campo de texto, filtros rápidos de la app oficial y resultados por bloque. */
@@ -55,20 +50,11 @@ fun SearchScreen(
     onOpenItem: (CatalogItem) -> Unit,
     onError: (String) -> Unit,
 ) {
-    val viewModel: SearchViewModel = viewModel(
-        factory = viewModelFactory { initializer { SearchViewModel(repository) } },
-    )
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val screen = rememberSearchScreen(repository, onError)
+    val viewModel = screen.viewModel
+    val state = screen.state
     val context = LocalContext.current
     val keyboard = LocalSoftwareKeyboardController.current
-
-    state.error?.let { error ->
-        val text = error.text(context)
-        LaunchedEffect(error) {
-            onError(text)
-            viewModel.dismissError()
-        }
-    }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         OutlinedTextField(
@@ -111,10 +97,14 @@ fun SearchScreen(
                     }
                 }
             }
-            when {
-                state.selectedFilter == null && state.filters.isEmpty() -> Box(Modifier.fillMaxSize())
-                state.filterItems.isEmpty() -> LoadingPanel()
-                else -> ItemGrid(state.filterItems, RowLayout.POSTER, onOpenItem)
+            when (val filter = state.filter) {
+                FilterState.Loading -> if (state.filters.isEmpty()) Box(Modifier.fillMaxSize()) else LoadingPanel()
+                is FilterState.Failed -> EmptyPanel(filter.error.text(context), viewModel::retryFilter)
+                is FilterState.Loaded -> if (filter.items.isEmpty()) {
+                    EmptyPanel(stringResource(R.string.state_empty_module), viewModel::retryFilter)
+                } else {
+                    ItemGrid(filter.items, RowLayout.POSTER, onOpenItem)
+                }
             }
         }
     }

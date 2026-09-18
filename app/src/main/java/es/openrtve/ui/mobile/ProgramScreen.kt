@@ -1,6 +1,5 @@
 package es.openrtve.ui.mobile
 
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -35,13 +34,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -56,23 +52,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
 import es.openrtve.data.WatchEntry
 import es.openrtve.data.WatchHistory
 import es.openrtve.domain.CatalogItem
+import es.openrtve.ui.LoadMoreOnScrollEnd
 import es.openrtve.ui.PlaySuggestion
-import es.openrtve.ui.ProgramUiState
 import es.openrtve.ui.ProgramViewModel
-import es.openrtve.ui.suggestPlay
-import es.openrtve.ui.text
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
+import es.openrtve.ui.rememberProgramScreen
+import es.openrtve.ui.shareLink
+import es.openrtve.ui.ProgramUiState
 
 /**
  * Ficha de programa: cabecera con imagen y botón grande (Reproducir, Continuar
@@ -87,42 +78,15 @@ fun ProgramScreen(
     onOpenItem: (CatalogItem) -> Unit,
     onError: (String) -> Unit,
 ) {
-    val viewModel: ProgramViewModel = viewModel(
-        key = "program-${program.id}",
-        factory = viewModelFactory { initializer { ProgramViewModel(repository, program.id, program.title) } },
-    )
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val screen = rememberProgramScreen(repository, history, program, onError)
+    val viewModel = screen.viewModel
+    val state = screen.state
     val listState = rememberLazyListState()
-    val historyEntries by history.entries.collectAsStateWithLifecycle()
-    val entriesById = remember(historyEntries) { historyEntries.associateBy { it.item.id } }
-    val suggestion = remember(historyEntries, state.episodes) { suggestPlay(history, program.id, state.episodes) }
-
-    state.error?.let { error ->
-        val text = error.text(context)
-        LaunchedEffect(error) {
-            onError(text)
-            viewModel.dismissError()
-        }
-    }
-
     // Paginación infinita: pide la siguiente página al acercarse al final.
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val info = listState.layoutInfo
-            val last = info.visibleItemsInfo.lastOrNull()?.index ?: -1
-            last >= info.totalItemsCount - 4
-        }
-    }
-    LaunchedEffect(listState) {
-        snapshotFlow { shouldLoadMore }
-            .distinctUntilChanged()
-            .filter { it }
-            .collect { viewModel.loadMore() }
-    }
+    LoadMoreOnScrollEnd(listState, threshold = 4, loadMore = viewModel::loadMore)
 
     Box(Modifier.fillMaxSize()) {
-        ProgramList(state, program, suggestion, entriesById, listState, viewModel, onOpenItem)
+        ProgramList(state, program, screen.suggestion, screen.entriesById, listState, viewModel, onOpenItem)
         IconButton(
             onClick = onBack,
             modifier = Modifier
@@ -287,7 +251,7 @@ private fun ProgramHeader(
                     )
                 }
                 state.detail?.webUrl?.let { url ->
-                    FilledTonalIconButton(onClick = { context.share(state.title, url) }) {
+                    FilledTonalIconButton(onClick = { context.shareLink(state.title, url) }) {
                         Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.action_share))
                     }
                 }
@@ -300,7 +264,7 @@ private fun ProgramHeader(
                 var expanded by remember { mutableStateOf(false) }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = AnnotatedString.fromHtml(html),
+                    text = remember(html) { AnnotatedString.fromHtml(html) },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
                     maxLines = if (expanded) Int.MAX_VALUE else 3,
@@ -335,13 +299,4 @@ private fun SeasonChips(state: ProgramUiState, onSelect: (String?) -> Unit) {
             )
         }
     }
-}
-
-private fun android.content.Context.share(title: String, url: String) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, title)
-        putExtra(Intent.EXTRA_TEXT, url)
-    }
-    startActivity(Intent.createChooser(intent, title))
 }

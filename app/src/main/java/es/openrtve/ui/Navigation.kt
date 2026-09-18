@@ -1,6 +1,8 @@
 package es.openrtve.ui
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
 import es.openrtve.domain.BlockReason
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.ContentKind
@@ -14,7 +16,6 @@ import es.openrtve.domain.referenceItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 
 enum class Tab { HOME, SEARCH, EXPLORE }
 
@@ -53,6 +54,13 @@ sealed interface UiMessage {
     data object LinkNotFound : UiMessage
 }
 
+/**
+ * Clave estable de una entrada de navegación: la raíz de la pestaña o su posición
+ * en la pila. Un mismo destino puede repetirse en la pila (programa -> vídeo ->
+ * programa), así que la clave es la posición y no el destino.
+ */
+fun entryKey(tab: Tab, index: Int): String = if (index < 0) "$tab/root" else "$tab/$index"
+
 data class NavigationState(
     val tab: Tab = Tab.HOME,
     val stacks: Map<Tab, List<Destination>> = Tab.entries.associateWith { emptyList() },
@@ -61,40 +69,72 @@ data class NavigationState(
     val stack: List<Destination> get() = stacks.getValue(tab)
     val current: Destination? get() = stack.lastOrNull()
     val canGoBack: Boolean get() = stack.isNotEmpty()
+
+    /** Clave de la pantalla visible. */
+    val currentKey: String get() = entryKey(tab, stack.lastIndex)
+
+    /** Claves de todas las entradas vivas, en cualquier pestaña. */
+    val liveKeys: Set<String>
+        get() = stacks.flatMapTo(mutableSetOf()) { (tab, stack) -> (-1 until stack.size).map { entryKey(tab, it) } }
 }
 
 /**
  * Navegación con barra inferior y una pila por pestaña. Sin librería de
  * navegación: tres pestañas y tres tipos de destino no la justifican.
+ *
+ * Cada entrada tiene su propio [ViewModelStore], que se libera al salir de la
+ * pila: así los ViewModels de las fichas no se acumulan durante toda la sesión.
  */
 class NavigationViewModel : ViewModel() {
     private val mutableState = MutableStateFlow(NavigationState())
     val state: StateFlow<NavigationState> = mutableState.asStateFlow()
 
+    private val stores = mutableMapOf<String, EntryStoreOwner>()
+
+    /** Dueño de los ViewModels de la entrada [key]; se crea la primera vez que se pide y es estable después. */
+    fun storeOwner(key: String): ViewModelStoreOwner = stores.getOrPut(key, ::EntryStoreOwner)
+
+    private class EntryStoreOwner : ViewModelStoreOwner {
+        override val viewModelStore = ViewModelStore()
+    }
+
     fun selectTab(tab: Tab) {
-        mutableState.update { current ->
-            // Repetir la pestaña activa vuelve a su raíz, como en las apps M3.
-            if (current.tab == tab) current.copy(stacks = current.stacks + (tab to emptyList())) else current.copy(tab = tab)
+        val current = mutableState.value
+        if (current.tab != tab) {
+            mutableState.value = current.copy(tab = tab)
+            return
         }
+        // Repetir la pestaña activa vuelve a su raíz, como en las apps M3.
+        mutableState.value = current.copy(stacks = current.stacks + (tab to emptyList()))
+        current.stack.indices.forEach { release(entryKey(tab, it)) }
     }
 
     fun push(destination: Destination) {
-        mutableState.update { current ->
-            current.copy(stacks = current.stacks + (current.tab to current.stack + destination))
-        }
+        val current = mutableState.value
+        mutableState.value = current.copy(stacks = current.stacks + (current.tab to current.stack + destination))
     }
 
     fun pop() {
-        mutableState.update { current ->
-            current.copy(stacks = current.stacks + (current.tab to current.stack.dropLast(1)))
-        }
+        val current = mutableState.value
+        if (current.stack.isEmpty()) return
+        mutableState.value = current.copy(stacks = current.stacks + (current.tab to current.stack.dropLast(1)))
+        release(current.currentKey)
     }
 
     fun show(message: UiMessage) {
-        mutableState.update { it.copy(message = message) }
+        mutableState.value = mutableState.value.copy(message = message)
     }
 
     fun dismissMessage() {
-        mutableState.update { it.copy(message = null) }
+        mutableState.value = mutableState.value.copy(message = null)
+    }
+
+    private fun release(key: String) {
+        stores.remove(key)?.viewModelStore?.clear()
+    }
+
+    override fun onCleared() {
+        stores.values.forEach { it.viewModelStore.clear() }
+        stores.clear()
     }
 }

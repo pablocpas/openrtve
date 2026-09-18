@@ -7,6 +7,9 @@ import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.ExploreGroup
 import es.openrtve.domain.LiveInfo
 import es.openrtve.domain.VideoDetail
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 fun LoadError.text(context: Context): String = when (this) {
     LoadError.Offline -> context.getString(R.string.error_offline)
@@ -26,18 +29,39 @@ fun BlockReason.text(context: Context): String = when (this) {
 /** "Hoy · 16:10" o "Mañana · 16:10" o "15/09 · 16:10", según el reloj. */
 fun LiveInfo.scheduleLabel(context: Context, nowMillis: Long): String? {
     val start = startsAtMillis ?: return null
-    val zone = java.util.TimeZone.getDefault()
-    val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).apply { timeZone = zone }.format(start)
-    val dayFormat = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.ROOT).apply { timeZone = zone }
-    val startDay = dayFormat.format(start).toInt()
-    val today = dayFormat.format(nowMillis).toInt()
-    val tomorrow = dayFormat.format(nowMillis + 24L * 60 * 60 * 1_000).toInt()
+    val formats = ScheduleFormats.current()
+    val startDay = formats.day.format(start).toInt()
+    val today = formats.day.format(nowMillis).toInt()
+    val tomorrow = formats.day.format(nowMillis + 24L * 60 * 60 * 1_000).toInt()
     val day = when (startDay) {
         today -> context.getString(R.string.schedule_today)
         tomorrow -> context.getString(R.string.schedule_tomorrow)
-        else -> java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault()).apply { timeZone = zone }.format(start)
+        else -> formats.date.format(start)
     }
-    return "$day · $time"
+    return "$day · ${formats.time.format(start)}"
+}
+
+/**
+ * Formateadores del horario, uno por hilo (`SimpleDateFormat` no es thread-safe)
+ * y renovados si cambian idioma o zona: cada tarjeta de directo los usa en cada
+ * tick del reloj y no merece la pena construirlos cada vez.
+ */
+private class ScheduleFormats(val locale: Locale, val zone: TimeZone) {
+    val time = SimpleDateFormat("HH:mm", locale).apply { timeZone = zone }
+    val day = SimpleDateFormat("yyyyMMdd", Locale.ROOT).apply { timeZone = zone }
+    val date = SimpleDateFormat("dd/MM", locale).apply { timeZone = zone }
+
+    companion object {
+        private val perThread = ThreadLocal<ScheduleFormats>()
+
+        fun current(): ScheduleFormats {
+            val locale = Locale.getDefault()
+            val zone = TimeZone.getDefault()
+            val cached = perThread.get()
+            if (cached != null && cached.locale == locale && cached.zone == zone) return cached
+            return ScheduleFormats(locale, zone).also(perThread::set)
+        }
+    }
 }
 
 fun UiMessage.text(context: Context): String = when (this) {
@@ -53,8 +77,12 @@ fun CatalogItem.metaLine(context: Context): String? = listOfNotNull(
     seasonTitle,
     episode?.let { context.getString(R.string.meta_episode, it) },
     publicationDate?.feedDateToDisplay(),
-    durationMs?.takeIf { it > 0 }?.let { context.getString(R.string.meta_minutes, (it / 60_000L).toInt()) },
+    durationMs?.let { minutesLabel(context, it) },
 ).takeIf { it.isNotEmpty() }?.joinToString(" · ")
+
+/** "52 min", redondeando; nada por debajo del medio minuto (un "0 min" no dice nada). */
+private fun minutesLabel(context: Context, durationMs: Long): String? =
+    ((durationMs + 30_000L) / 60_000L).toInt().takeIf { it > 0 }?.let { context.getString(R.string.meta_minutes, it) }
 
 /**
  * Cabecera de un grupo de Explorar, o `null` si no lleva: el menú oficial es plano y
@@ -67,7 +95,7 @@ fun ExploreGroup.header(context: Context): String? =
 /** "2018 · 108 min · No recomendable para menores de 12 años", omitiendo lo que falte. */
 fun VideoDetail.metaLine(context: Context): String? = listOfNotNull(
     year,
-    item.durationMs?.takeIf { it > 0 }?.let { context.getString(R.string.meta_minutes, (it / 60_000L).toInt()) },
+    item.durationMs?.let { minutesLabel(context, it) },
     ageRating,
 ).takeIf { it.isNotEmpty() }?.joinToString(" · ")
 

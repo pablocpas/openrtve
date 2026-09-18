@@ -34,7 +34,8 @@
 
         <activity
             android:name=".ui.tv.TvActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
@@ -50,8 +51,9 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Enlaces de RTVE Play: play.rtve.es/pr|v|d/{id} y las URL web de rtve.es/play/... -->
-            <intent-filter>
+            <!-- Enlaces de RTVE Play: play.rtve.es/pr|v|d/{id} y las URL web de rtve.es/play/...
+                 Sin autoVerify: RTVE no publica assetlinks para terceros (ver README). -->
+            <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -62,7 +64,7 @@
                 <data android:pathPrefix="/d/" />
                 <data android:pathPrefix="/content" />
             </intent-filter>
-            <intent-filter>
+            <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />

@@ -1,6 +1,7 @@
 package es.openrtve.ui.mobile
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -15,10 +16,10 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -26,38 +27,30 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import es.openrtve.AppContainer
 import es.openrtve.R
-import es.openrtve.domain.BlockReason
-import es.openrtve.domain.CatalogItem
-import es.openrtve.domain.ContentKind
-import es.openrtve.domain.referenceItem
-import es.openrtve.domain.PlaybackDecision
 import es.openrtve.domain.RtveUrls
-import es.openrtve.playback.PlayerActivity
 import es.openrtve.ui.Destination
-import es.openrtve.ui.destination
+import es.openrtve.ui.DestinationHost
+import es.openrtve.ui.LocalNowMillis
 import es.openrtve.ui.NavigationViewModel
 import es.openrtve.ui.Tab
-import es.openrtve.ui.UiMessage
-import es.openrtve.ui.scheduleLabel
-import es.openrtve.ui.text
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.CompositionLocalProvider
-import es.openrtve.ui.LocalNowMillis
+import es.openrtve.ui.rememberCatalogActions
 import es.openrtve.ui.rememberNowMillis
+import es.openrtve.ui.text
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 @Composable
 fun MobileApp(
     container: AppContainer,
-    pendingLink: String? = null,
-    onLinkConsumed: () -> Unit = {},
+    /** Enlaces recibidos por la actividad (VIEW o Compartir). */
+    incomingLinks: Flow<String> = emptyFlow(),
 ) {
     val repository = container.catalogRepository
-    val playbackResolver = container.playbackResolver
     val navigation: NavigationViewModel = viewModel()
     val nav by navigation.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
+    val actions = rememberCatalogActions(container, navigation)
 
     BackHandler(enabled = nav.canGoBack, onBack = navigation::pop)
 
@@ -69,147 +62,111 @@ fun MobileApp(
         }
     }
 
-    val play: (CatalogItem, Boolean) -> Unit = { item, restart ->
-        when (val decision = playbackResolver.resolve(item)) {
-            is PlaybackDecision.Ready -> {
-                container.watchHistory.register(item)
-                context.startActivity(PlayerActivity.intent(context, decision, restart))
-            }
-            is PlaybackDecision.Blocked -> {
-                val schedule = item.live?.scheduleLabel(context, System.currentTimeMillis())
-                if (decision.reason == BlockReason.NOT_STARTED_YET && schedule != null) {
-                    navigation.show(UiMessage.StartsAt(schedule))
-                } else {
-                    navigation.show(UiMessage.Blocked(decision.reason))
-                }
-            }
-        }
+    LaunchedEffect(incomingLinks, actions) {
+        incomingLinks.collect(actions::openIncomingLink)
     }
-    val playItem: (CatalogItem) -> Unit = { play(it, false) }
-
-    // Enlace recibido (VIEW o Compartir): se resuelve por red y se abre como cualquier item.
-    // La resolución va en el scope de la pantalla: consumir el enlace reinicia el efecto.
-    LaunchedEffect(pendingLink) {
-        val url = pendingLink ?: return@LaunchedEffect
-        onLinkConsumed()
-        scope.launch {
-            val item = runCatching { container.deepLinkResolver.resolve(url) }.getOrNull()
-            when (item?.kind) {
-                null -> navigation.show(UiMessage.LinkNotFound)
-                ContentKind.PROGRAM -> navigation.push(Destination.Program(item))
-                ContentKind.VIDEO, ContentKind.AUDIO -> navigation.push(Destination.Video(item))
-                else -> play(item, false)
-            }
-        }
-    }
-    // Programas y vídeos abren su ficha; directos y audios se reproducen al momento.
-    val openItem: (CatalogItem) -> Unit = { item ->
-        when (item.kind) {
-            ContentKind.PROGRAM -> navigation.push(Destination.Program(item))
-            ContentKind.VIDEO, ContentKind.AUDIO -> navigation.push(Destination.Video(item))
-            else -> playItem(item)
-        }
-    }
-    val showError: (String) -> Unit = { navigation.show(UiMessage.Text(it)) }
 
     val nowMillis = rememberNowMillis()
     CompositionLocalProvider(LocalNowMillis provides nowMillis) {
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = nav.tab == Tab.HOME,
-                    onClick = { navigation.selectTab(Tab.HOME) },
-                    icon = { Icon(Icons.Filled.Home, contentDescription = null) },
-                    label = { Text(stringResource(R.string.tab_home)) },
-                )
-                NavigationBarItem(
-                    selected = nav.tab == Tab.SEARCH,
-                    onClick = { navigation.selectTab(Tab.SEARCH) },
-                    icon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    label = { Text(stringResource(R.string.tab_search)) },
-                )
-                NavigationBarItem(
-                    selected = nav.tab == Tab.EXPLORE,
-                    onClick = { navigation.selectTab(Tab.EXPLORE) },
-                    icon = { Icon(Icons.Filled.Menu, contentDescription = null) },
-                    label = { Text(stringResource(R.string.tab_explore)) },
-                )
-            }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        val modifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
-        androidx.compose.foundation.layout.Box(modifier) {
-            when (val destination = nav.current) {
-                is Destination.Portada -> PortadaScreen(
-                    repository = repository,
-                    url = destination.url,
-                    title = destination.title,
-                    onBack = navigation::pop,
-                    onOpenItem = openItem,
-                    onOpenRow = { row, title -> navigation.push(Destination.Module(row, title)) },
-                        onOpenLink = { link -> link.destination()?.let(navigation::push) },
-                    onError = showError,
-                )
-                is Destination.Module -> ModuleScreen(
-                    repository = repository,
-                    row = destination.row,
-                    title = destination.title,
-                    onBack = navigation::pop,
-                    onOpenItem = openItem,
-                    onError = showError,
-                )
-                is Destination.Program -> ProgramScreen(
-                    repository = repository,
-                    history = container.watchHistory,
-                    program = destination.item,
-                    onBack = navigation::pop,
-                    onOpenItem = playItem,
-                    onError = showError,
-                )
-                Destination.Settings -> SettingsScreen(
-                    container = container,
-                    onBack = navigation::pop,
-                    onMessage = showError,
-                )
-                is Destination.Video -> VideoScreen(
-                    repository = repository,
-                    history = container.watchHistory,
-                    item = destination.item,
-                    onBack = navigation::pop,
-                    onPlay = play,
-                    onOpenProgram = { id, title -> navigation.push(Destination.Program(referenceItem(id, ContentKind.PROGRAM, title))) },
-                    onError = showError,
-                )
-                null -> when (nav.tab) {
-                    Tab.HOME -> PortadaScreen(
-                        repository = repository,
-                        url = RtveUrls.TV_HOME,
-                        title = "",
-                        history = container.watchHistory,
-                        onBack = null,
-                        onOpenItem = openItem,
-                        onOpenRow = { row, title -> navigation.push(Destination.Module(row, title)) },
-                        onOpenLink = { link -> link.destination()?.let(navigation::push) },
-                        onError = showError,
-                        onOpenSettings = { navigation.push(Destination.Settings) },
+        Scaffold(
+            bottomBar = {
+                NavigationBar {
+                    NavigationBarItem(
+                        selected = nav.tab == Tab.HOME,
+                        onClick = { navigation.selectTab(Tab.HOME) },
+                        icon = { Icon(Icons.Filled.Home, contentDescription = null) },
+                        label = { Text(stringResource(R.string.tab_home)) },
                     )
-                    Tab.SEARCH -> SearchScreen(
-                        repository = repository,
-                        onOpenItem = openItem,
-                        onError = showError,
+                    NavigationBarItem(
+                        selected = nav.tab == Tab.SEARCH,
+                        onClick = { navigation.selectTab(Tab.SEARCH) },
+                        icon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        label = { Text(stringResource(R.string.tab_search)) },
                     )
-                    Tab.EXPLORE -> ExploreScreen(
-                        repository = repository,
-                        onOpenCategory = { navigation.push(it.destination()) },
-                        onOpenSettings = { navigation.push(Destination.Settings) },
+                    NavigationBarItem(
+                        selected = nav.tab == Tab.EXPLORE,
+                        onClick = { navigation.selectTab(Tab.EXPLORE) },
+                        icon = { Icon(Icons.Filled.Menu, contentDescription = null) },
+                        label = { Text(stringResource(R.string.tab_explore)) },
                     )
+                }
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+        ) { padding ->
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            ) {
+                DestinationHost(nav, navigation) { destination ->
+                    when (destination) {
+                        is Destination.Portada -> PortadaScreen(
+                            repository = repository,
+                            url = destination.url,
+                            title = destination.title,
+                            onBack = navigation::pop,
+                            onOpenItem = actions.openItem,
+                            onOpenRow = actions.openRow,
+                            onOpenLink = actions.openLink,
+                            onError = actions.showMessage,
+                        )
+                        is Destination.Module -> ModuleScreen(
+                            repository = repository,
+                            row = destination.row,
+                            title = destination.title,
+                            onBack = navigation::pop,
+                            onOpenItem = actions.openItem,
+                            onError = actions.showMessage,
+                        )
+                        is Destination.Program -> ProgramScreen(
+                            repository = repository,
+                            history = container.watchHistory,
+                            program = destination.item,
+                            onBack = navigation::pop,
+                            onOpenItem = actions.playItem,
+                            onError = actions.showMessage,
+                        )
+                        Destination.Settings -> SettingsScreen(
+                            container = container,
+                            onBack = navigation::pop,
+                            onMessage = actions.showMessage,
+                        )
+                        is Destination.Video -> VideoScreen(
+                            repository = repository,
+                            history = container.watchHistory,
+                            item = destination.item,
+                            onBack = navigation::pop,
+                            onPlay = actions::play,
+                            onOpenProgram = actions.openProgram,
+                            onError = actions.showMessage,
+                        )
+                        null -> when (nav.tab) {
+                            Tab.HOME -> PortadaScreen(
+                                repository = repository,
+                                url = RtveUrls.TV_HOME,
+                                title = "",
+                                history = container.watchHistory,
+                                onBack = null,
+                                onOpenItem = actions.openItem,
+                                onOpenRow = actions.openRow,
+                                onOpenLink = actions.openLink,
+                                onError = actions.showMessage,
+                                onOpenSettings = actions.openSettings,
+                            )
+                            Tab.SEARCH -> SearchScreen(
+                                repository = repository,
+                                onOpenItem = actions.openItem,
+                                onError = actions.showMessage,
+                            )
+                            Tab.EXPLORE -> ExploreScreen(
+                                repository = repository,
+                                onOpenCategory = actions.openCategory,
+                                onOpenSettings = actions.openSettings,
+                            )
+                        }
+                    }
                 }
             }
         }
-    }
     }
 }

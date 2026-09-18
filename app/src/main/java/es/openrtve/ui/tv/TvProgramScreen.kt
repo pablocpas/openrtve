@@ -16,11 +16,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
@@ -34,10 +30,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -45,14 +37,11 @@ import coil3.compose.AsyncImage
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
 import es.openrtve.data.WatchHistory
+import es.openrtve.ui.LoadMoreOnScrollEnd
 import es.openrtve.ui.PlaySuggestion
-import es.openrtve.ui.suggestPlay
+import es.openrtve.ui.rememberProgramScreen
 import es.openrtve.domain.CatalogItem
-import es.openrtve.ui.ProgramViewModel
 import es.openrtve.ui.metaLine
-import es.openrtve.ui.text
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 
 /**
  * Ficha de programa en TV al estilo de las apps de streaming: fondo a pantalla
@@ -67,34 +56,15 @@ fun TvProgramScreen(
     onOpenItem: (CatalogItem) -> Unit,
     onError: (String) -> Unit,
 ) {
-    val viewModel: ProgramViewModel = viewModel(
-        key = "program-${program.id}",
-        factory = viewModelFactory { initializer { ProgramViewModel(repository, program.id, program.title) } },
-    )
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val screen = rememberProgramScreen(repository, history, program, onError)
+    val viewModel = screen.viewModel
+    val state = screen.state
+    val entriesById = screen.entriesById
+    val suggestion = screen.suggestion
     val context = LocalContext.current
     val listState = rememberLazyListState()
     val background = MaterialTheme.colorScheme.background
-    val historyEntries by history.entries.collectAsStateWithLifecycle()
-    val entriesById = remember(historyEntries) { historyEntries.associateBy { it.item.id } }
-    val suggestion = remember(historyEntries, state.episodes) { suggestPlay(history, program.id, state.episodes) }
-
-    state.error?.let { error ->
-        val text = error.text(context)
-        LaunchedEffect(error) {
-            onError(text)
-            viewModel.dismissError()
-        }
-    }
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val info = listState.layoutInfo
-            (info.visibleItemsInfo.lastOrNull()?.index ?: -1) >= info.totalItemsCount - 3
-        }
-    }
-    LaunchedEffect(listState) {
-        snapshotFlow { shouldLoadMore }.distinctUntilChanged().filter { it }.collect { viewModel.loadMore() }
-    }
+    LoadMoreOnScrollEnd(listState, threshold = 3, loadMore = viewModel::loadMore)
 
     Box(Modifier.fillMaxSize()) {
         AsyncImage(
@@ -139,7 +109,7 @@ fun TvProgramScreen(
                 state.detail?.description?.let {
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        text = AnnotatedString.fromHtml(it),
+                        text = remember(it) { AnnotatedString.fromHtml(it) },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
                         maxLines = 3,

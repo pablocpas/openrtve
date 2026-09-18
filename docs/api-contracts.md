@@ -423,6 +423,24 @@ Sondeos con `GET` de un byte, sin seguir la redirección ni descargar contenido:
 - El HLS de un directo con DRM usa `SAMPLE-AES` + `skd://` (FairPlay): en
   Android hay que usar el MPD.
 
+### Orden de los episodios (verificado el 18-09-2026)
+
+- `programas/{id}/videos.json` y `programas/{id}/temporadas/{sid}/videos.json`
+  aceptan `order=multimedia_date_emission,asc|desc` (sin él, `desc`). La app
+  oficial lo decide en `ProgramaFragmentOrderUtils.getOrderForVideos` a partir
+  de `programTypeID`, `outOfEmission` e `isComplete` del programa:
+  `isComplete` → `asc`; en emisión y tipo 132534/136522 (Noticias, Especial
+  Evento) → `desc`; tipo 136613/136525/136521/137650 (Conciertos, Entrevistas,
+  Reportajes Factual, Documental) → `desc`; en emisión y primera pestaña de
+  temporada (o lista completa) → `desc`; el resto → `asc`. OpenRTVE lo replica
+  en `ProgramDetail.episodeOrder`.
+- Las temporadas salen de `seasons` del programa (las de `numEpisodes` 0 no se
+  listan), ordenadas por `orden` en local: descendente si el programa emite, está
+  completo o es de los tipos "siempre `desc`"; ascendente si terminó sin
+  completar. `temporadas.json` ignora `order`.
+- Un item de colección sin `id` propio y con `lastMultimedia` (visto en
+  "Descubre las novedades de la temporada") es ese medio, no un programa.
+
 ### Radio (verificado el 13-09-2026)
 
 - Los episodios de un programa de radio están en `programas/{id}/audios.json`

@@ -1,36 +1,26 @@
 package es.openrtve.ui.mobile
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import android.app.UiModeManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
+import android.os.Bundle
+import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import es.openrtve.OpenRtveApplication
+import es.openrtve.ui.LinkInbox
 import es.openrtve.ui.theme.OpenRtveTheme
 import es.openrtve.ui.tv.TvActivity
-import androidx.compose.runtime.mutableStateOf
-
-private val URL_PATTERN = Regex("""https?://[^\s<>"]+""")
 
 class MainActivity : ComponentActivity() {
-    /** Enlace recibido por VIEW o por SEND; la UI lo consume y lo pone a null. */
-    private val pendingLink = mutableStateOf<String?>(null)
-
-    private fun linkFrom(intent: Intent?): String? = when (intent?.action) {
-        Intent.ACTION_VIEW -> intent.dataString
-        Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
-            ?.let { text -> URL_PATTERN.find(text)?.value }
-        else -> null
-    }
+    private val links = LinkInbox()
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        linkFrom(intent)?.let { pendingLink.value = it }
+        links.offer(intent)
     }
 
     private fun isTelevision(): Boolean {
@@ -41,9 +31,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Algunos launchers de TV abren la actividad LAUNCHER en vez de la LEANBACK_LAUNCHER.
+        // Algunos launchers de TV abren la actividad LAUNCHER en vez de la LEANBACK_LAUNCHER;
+        // el intent (con su enlace, si lo trae) se reenvía tal cual.
         if (isTelevision()) {
-            startActivity(Intent(this, TvActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+            startActivity(
+                Intent(this, TvActivity::class.java).apply {
+                    action = intent.action
+                    data = intent.data
+                    intent.extras?.let(::putExtras)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+            )
             finish()
             return
         }
@@ -53,14 +51,10 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         val container = (application as OpenRtveApplication).container
-        if (savedInstanceState == null) linkFrom(intent)?.let { pendingLink.value = it }
+        if (savedInstanceState == null) links.offer(intent)
         setContent {
             OpenRtveTheme {
-                MobileApp(
-                    container = container,
-                    pendingLink = pendingLink.value,
-                    onLinkConsumed = { pendingLink.value = null },
-                )
+                MobileApp(container = container, incomingLinks = links.links)
             }
         }
     }

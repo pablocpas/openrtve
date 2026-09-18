@@ -18,20 +18,29 @@ UI ─> PlaybackResolver ─> PlayerActivity ─> MediaController
                                       └───> MediaSessionService + ExoPlayer
 ```
 
-- Estado inmutable mediante `StateFlow`; un ViewModel por pantalla, creado
-  con clave (`viewModel(key = "portada-$url")`) para que cada portada, módulo
-  o programa conserve su estado al navegar.
+- Estado inmutable mediante `StateFlow`; un ViewModel por pantalla. El
+  pegamento de cada pantalla (crear el ViewModel, observar su estado, cruzarlo
+  con el historial, entregar los errores una vez) está en `ui/ScreenStates.kt`
+  y lo comparten móvil y TV; las pantallas solo pintan. Las acciones comunes
+  (abrir fichas, reproducir o explicar por qué no, mensajes) están en
+  `CatalogActions`.
 - Navegación propia: tres pestañas y una pila de destinos por pestaña en
   `NavigationViewModel`. Una librería de navegación no aporta nada con tres
-  tipos de destino.
+  tipos de destino. Cada entrada de la pila (clave `pestaña/posición`) tiene su
+  propio `ViewModelStore`, que se libera al salir de ella, y `DestinationHost`
+  la envuelve en un `SaveableStateHolder`: al volver atrás se recuperan scroll y
+  foco, y los ViewModels de las fichas no se acumulan durante la sesión.
 - La presentación de cada fila (`RowLayout`) se deduce del `tipo` editorial
   en el parser; la UI solo decide tamaños.
-- La portada carga cada fila por separado (máximo cuatro en paralelo) para
+- La portada carga cada fila por separado (máximo seis en paralelo) para
   que una sección lenta o rota no bloquee las demás; las vacías se ocultan.
   El patrón de secciones + carrusel + tarjeta con imagen procede de Findroid.
 - Toda captura de excepciones en corrutinas relanza `CancellationException`:
   un `runCatching` alrededor de una suspensión convertiría una cancelación en
-  un error visible.
+  un error visible. Las llamadas bloqueantes de OkHttp van bajo
+  `runInterruptible(Dispatchers.IO)` y `SafeHttpsClient` cancela la llamada si
+  interrumpen el hilo: un refresh o salir de la pantalla corta la descarga en
+  vez de dejarla ocupando un permiso del semáforo hasta el timeout.
 - Un repositorio como única entrada al catálogo.
 - JSON dinámico convertido inmediatamente a modelos pequeños del dominio.
 - Inyección manual en `Application`; no hay un grafo que justifique Hilt.
@@ -77,8 +86,9 @@ el parser lo convierte en `LiveInfo` y la UI calcula el progreso con el reloj
 red. Un directo programado (`live=false` con `inicio` futuro) se muestra con su
 horario y el resolver lo bloquea hasta la hora.
 
-"Seguir viendo" es local (`WatchHistory`, un JSON en `filesDir`): el
-reproductor guarda la posición cada 10 s y al salir; por debajo de 30 s no
+"Seguir viendo" es local (`WatchHistory`, un JSON en `filesDir` escrito con
+`AtomicFile` fuera del hilo principal): el reproductor guarda la posición cada
+10 s y al salir; por debajo de 30 s no
 cuenta y al 95 % el episodio pasa a "visto" (sale de la fila, pero la ficha del
 programa lo usa para proponer el siguiente: `suggestPlay`, con Reproducir /
 Continuar / Siguiente). La portada raíz pinta la fila tras el hero.
@@ -96,7 +106,9 @@ RTVE Play y URLs web; `content?uri=` se decodifica una sola vez) y
 `audios/{id}`, `programas/{id}`, `lives/{idAsset}`; un permalink de programa se
 casa contra el `htmlUrl` de los resultados del buscador y uno de directo contra
 el feed de "Ahora en emisión". `MainActivity` (`singleTask`) recibe `VIEW` y
-`SEND`; el segundo es el que no depende de la verificación de dominio.
+`SEND`; el segundo es el que no depende de la verificación de dominio. Los
+enlaces llegan a la UI por un `LinkInbox` (canal conflated, se consumen una
+vez); en TV, `MainActivity` reenvía el intent a `TvActivity` y esta lo trata igual.
 
 ## Reproductor
 

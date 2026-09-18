@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.util.Rational
@@ -59,6 +60,7 @@ import androidx.media3.ui.PlayerView
 import android.content.res.Configuration
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.compose.foundation.layout.padding
@@ -78,7 +80,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
 
 @OptIn(UnstableApi::class)
 class PlayerActivity : ComponentActivity() {
@@ -157,7 +159,6 @@ class PlayerActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        requestNotificationPermissionIfNeeded()
 
         request = PlaybackRequest.from(intent)
         applyPresentation()
@@ -348,9 +349,7 @@ class PlayerActivity : ComponentActivity() {
             // La licencia es temporal: se pide justo antes de reproducir y no se guarda.
             val licenseUrl = request.drmTokenUrl?.let { tokenUrl ->
                 try {
-                    withContext(Dispatchers.IO) {
-                        (application as OpenRtveApplication).container.drmTokenClient.widevineLicenseUrl(tokenUrl)
-                    }
+                    runInterruptible(Dispatchers.IO) { container.drmTokenClient.widevineLicenseUrl(tokenUrl) }
                 } catch (error: CancellationException) {
                     throw error
                 } catch (_: Exception) {
@@ -444,6 +443,8 @@ class PlayerActivity : ComponentActivity() {
 
     private fun applyPresentation() {
         val isVideo = request?.isAudioOnly == false
+        // Solo el audio sigue en segundo plano con notificación; el vídeo no la necesita.
+        if (request?.isAudioOnly == true) requestNotificationPermissionIfNeeded()
         // Vídeo en horizontal (sigue al sensor entre las dos orientaciones apaisadas); audio en la orientación normal.
         requestedOrientation = if (isVideo) {
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
@@ -457,19 +458,33 @@ class PlayerActivity : ComponentActivity() {
         } else {
             insets.show(WindowInsetsCompat.Type.systemBars())
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            setPictureInPictureParams(
-                pictureInPictureParams()
-                    .setAutoEnterEnabled(isVideo && canEnterPictureInPicture() && settings.current.pictureInPictureOnLeave)
-                    .setSeamlessResizeEnabled(false)
-                    .build(),
-            )
-        }
+        refreshPictureInPictureParams()
+    }
+
+    /**
+     * Parámetros de PiP para el sistema: entrada automática al salir (si es vídeo y
+     * el ajuste lo permite) y, con la vista ya medida, el recuadro del vídeo como
+     * origen para que la transición salga de él y no de toda la pantalla.
+     */
+    internal fun refreshPictureInPictureParams() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val isVideo = request?.isAudioOnly == false
+        setPictureInPictureParams(
+            pictureInPictureParams()
+                .setAutoEnterEnabled(isVideo && canEnterPictureInPicture() && settings.current.pictureInPictureOnLeave)
+                .setSeamlessResizeEnabled(false)
+                .build(),
+        )
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun pictureInPictureParams(): PictureInPictureParams.Builder =
-        PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9))
+        PictureInPictureParams.Builder()
+            .setAspectRatio(Rational(16, 9))
+            .apply {
+                val rect = Rect()
+                if (playerView?.videoSurfaceView?.getGlobalVisibleRect(rect) == true) setSourceRectHint(rect)
+            }
 
     private fun canEnterPictureInPicture(): Boolean =
         request?.isAudioOnly == false &&
@@ -628,8 +643,11 @@ private fun PlaybackScreen(
             controller == null -> CircularProgressIndicator()
             else -> AndroidView(
                 factory = { context ->
-                    val view = LayoutInflater.from(context).inflate(R.layout.player_view, null) as PlayerView
+                    val view = LayoutInflater.from(context).inflate(R.layout.player_view, FrameLayout(context), false) as PlayerView
                     val activity = context as PlayerActivity
+                    view.addOnLayoutChangeListener { _, l, t, r, b, oldL, oldT, oldR, oldB ->
+                        if (l != oldL || t != oldT || r != oldR || b != oldB) activity.refreshPictureInPictureParams()
+                    }
                     view.findViewById<ImageButton>(R.id.player_back).setOnClickListener { onBack() }
                     view.findViewById<ImageButton>(R.id.player_lock).setOnClickListener {
                         view.hideController()

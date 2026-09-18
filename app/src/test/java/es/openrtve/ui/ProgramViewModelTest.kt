@@ -1,5 +1,7 @@
 package es.openrtve.ui
 
+import es.openrtve.data.HttpStatusException
+import es.openrtve.domain.EpisodeOrder
 import es.openrtve.domain.ProgramDetail
 import es.openrtve.domain.ProgramSeason
 import es.openrtve.testing.FakeCatalogRepository
@@ -44,7 +46,7 @@ class ProgramViewModelTest {
         assertTrue(state.hasMore)
         assertFalse(state.isLoading)
         assertFalse(state.showingClips)
-        assertEquals(listOf("program(135930, force=false)", "programVideos(135930, season=null, page=1, complete=true)"), repository.calls)
+        assertEquals(listOf("program(135930, force=false)", "programVideos(135930, season=null, page=1, complete=true, order=NEWEST_FIRST)"), repository.calls)
     }
 
     @Test
@@ -174,6 +176,43 @@ class ProgramViewModelTest {
         val viewModel = ProgramViewModel(repository, "1", "")
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.isStale)
+    }
+
+    @Test
+    fun `the order follows the RTVE Play rule for the program and the selected season`() = runTest(mainDispatcher.dispatcher) {
+        // Serie en emisión con dos temporadas (la más reciente primero): la actual del final, la pasada del principio.
+        repository.program = { id, _ ->
+            loaded(detail(id).copy(seasons = listOf(ProgramSeason("t2", "Temporada 2", 3, order = 2), ProgramSeason("t1", "Temporada 1", 10, order = 1))))
+        }
+        val viewModel = ProgramViewModel(repository, "1", "")
+        advanceUntilIdle()
+        assertEquals(EpisodeOrder.NEWEST_FIRST, viewModel.uiState.value.order)
+
+        viewModel.selectSeason("t2")
+        advanceUntilIdle()
+        assertEquals(EpisodeOrder.NEWEST_FIRST, viewModel.uiState.value.order)
+
+        viewModel.selectSeason("t1")
+        advanceUntilIdle()
+        assertEquals(EpisodeOrder.OLDEST_FIRST, viewModel.uiState.value.order)
+        assertTrue(repository.calls.last().endsWith("order=OLDEST_FIRST)"))
+
+        viewModel.loadMore()
+        advanceUntilIdle()
+        assertTrue("las páginas siguientes mantienen el sentido", repository.calls.last().contains("page=2, complete=true, order=OLDEST_FIRST"))
+    }
+
+    @Test
+    fun `a complete series is read from the beginning and one without detail from the end`() = runTest(mainDispatcher.dispatcher) {
+        repository.program = { id, _ -> loaded(detail(id).copy(isComplete = true)) }
+        val complete = ProgramViewModel(repository, "1", "")
+        advanceUntilIdle()
+        assertEquals(EpisodeOrder.OLDEST_FIRST, complete.uiState.value.order)
+
+        repository.program = { _, _ -> throw HttpStatusException(500) }
+        val unknown = ProgramViewModel(repository, "2", "")
+        advanceUntilIdle()
+        assertEquals(EpisodeOrder.NEWEST_FIRST, unknown.uiState.value.order)
     }
 
     private fun detail(id: String) = ProgramDetail(

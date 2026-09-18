@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,10 +33,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -46,19 +41,13 @@ import es.openrtve.data.CatalogRepository
 import es.openrtve.data.WatchEntry
 import es.openrtve.data.WatchHistory
 import es.openrtve.ui.LocalNowMillis
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleResumeEffect
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.HomeLink
 import es.openrtve.domain.HomeRow
 import es.openrtve.domain.RowLayout
 import es.openrtve.ui.HomeSection
-import es.openrtve.ui.PortadaViewModel
 import es.openrtve.ui.SectionState
+import es.openrtve.ui.rememberPortadaScreen
 import es.openrtve.ui.text
 
 /**
@@ -76,37 +65,11 @@ fun TvPortadaScreen(
     history: WatchHistory? = null,
     onOpenLink: (HomeLink) -> Unit = {},
 ) {
-    val viewModel: PortadaViewModel = viewModel(
-        key = "portada-$url",
-        factory = viewModelFactory { initializer { PortadaViewModel(repository, url) } },
-    )
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val screen = rememberPortadaScreen(repository, url, history, onError)
+    val viewModel = screen.viewModel
+    val state = screen.state
+    val resumable = screen.resumable
     val firstRowFocus = remember { FocusRequester() }
-    val historyEntries by (history?.entries ?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle()
-    val resumable = remember(historyEntries) { history?.resumable.orEmpty() }
-
-    LifecycleResumeEffect(viewModel) {
-        viewModel.onResumed()
-        onPauseOrDispose { }
-    }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(viewModel) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            while (true) {
-                delay(LIVE_REFRESH_MS)
-                viewModel.refreshLiveSections()
-            }
-        }
-    }
-
-    state.error?.let { error ->
-        val text = error.text(context)
-        LaunchedEffect(error) {
-            onError(text)
-            viewModel.dismissError()
-        }
-    }
     val firstLoadedId = state.sections.firstOrNull { it.state is SectionState.Loaded || it.state is SectionState.Links }?.row?.id
     LaunchedEffect(firstLoadedId) {
         if (firstLoadedId != null) runCatching { firstRowFocus.requestFocus() }
@@ -190,7 +153,7 @@ private fun TvSection(
                 repeat(if (layout == RowLayout.HERO) 2 else 4) {
                     Box(
                         modifier = Modifier.width(if (layout == RowLayout.HERO) TvHeroWidth else layout.cardWidth())
-                            .aspectRatio(layout.aspectRatio())
+                            .aspectRatio(layout.aspectRatio)
                             .clip(TvCardShape)
                             .background(MaterialTheme.colorScheme.surface),
                     )
@@ -329,4 +292,3 @@ private fun TvHeroRow(items: List<CatalogItem>, onOpenItem: (CatalogItem) -> Uni
 }
 
 private val TvHeroWidth = 380.dp
-private const val LIVE_REFRESH_MS = 60_000L

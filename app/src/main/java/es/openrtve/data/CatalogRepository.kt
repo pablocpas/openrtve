@@ -4,6 +4,7 @@ import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.CatalogLoad
 import es.openrtve.domain.CatalogModule
 import es.openrtve.domain.CatalogPage
+import es.openrtve.domain.EpisodeOrder
 import es.openrtve.domain.ExploreGroup
 import es.openrtve.domain.HomeFeed
 import es.openrtve.domain.HomeRow
@@ -15,7 +16,9 @@ import es.openrtve.domain.SearchResults
 import es.openrtve.domain.VideoDetail
 import java.io.IOException
 import java.net.URLEncoder
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 
 /** Ausencia de copia local cuando se pidió solo caché. */
@@ -47,12 +50,14 @@ interface CatalogRepository {
     /**
      * Episodios de un programa o de una temporada. `completeOnly` pide solo
      * contenidos completos (`type=39816`); sin él llegan también los fragmentos.
+     * [order] es el de RTVE Play para ese programa (ver `ProgramDetail.episodeOrder`).
      */
     suspend fun loadProgramVideos(
         programId: String,
         seasonId: String? = null,
         page: Int = 1,
         completeOnly: Boolean = true,
+        order: EpisodeOrder = EpisodeOrder.NEWEST_FIRST,
         forceRefresh: Boolean = false,
     ): CatalogLoad<CatalogPage>
 }
@@ -122,9 +127,9 @@ class DefaultCatalogRepository(
     )
 
     // Las búsquedas no se persisten: solo interesa el resultado del momento.
-    override suspend fun search(query: String): SearchResults = withContext(Dispatchers.IO) {
+    override suspend fun search(query: String): SearchResults {
         val url = "${RtveUrls.SEARCH}?search=${encode(query)}&context=tve&tipology=video&type=completo"
-        parser.parseSearch(httpClient.get(url))
+        return parser.parseSearch(fetchRaw(url))
     }
 
     override suspend fun loadModule(
@@ -188,14 +193,13 @@ class DefaultCatalogRepository(
         parse = parser::parseVideoPage,
     )
 
-    override suspend fun loadNextVideo(videoId: String): CatalogItem? = withContext(Dispatchers.IO) {
-        parser.parseVideoPage(httpClient.get("$VIDEOS_BASE/${encode(videoId)}/next.json")).items.firstOrNull()
-    }
+    override suspend fun loadNextVideo(videoId: String): CatalogItem? =
+        parser.parseVideoPage(fetchRaw("$VIDEOS_BASE/${encode(videoId)}/next.json")).items.firstOrNull()
 
-    override suspend fun loadPreviewSprite(videoId: String): PreviewSprite? = withContext(Dispatchers.IO) {
-        val (spriteUrl, vttUrl) = parser.parseSpriteInfo(httpClient.get("$PREVIEWS_BASE/sprite?idasset=${encode(videoId)}"))
-            ?: return@withContext null
-        parser.parseSpriteVtt(httpClient.get(vttUrl), spriteUrl)
+    override suspend fun loadPreviewSprite(videoId: String): PreviewSprite? {
+        val (spriteUrl, vttUrl) = parser.parseSpriteInfo(fetchRaw("$PREVIEWS_BASE/sprite?idasset=${encode(videoId)}"))
+            ?: return null
+        return parser.parseSpriteVtt(fetchRaw(vttUrl), spriteUrl)
     }
 
     override suspend fun loadProgramVideos(
@@ -203,6 +207,7 @@ class DefaultCatalogRepository(
         seasonId: String?,
         page: Int,
         completeOnly: Boolean,
+        order: EpisodeOrder,
         forceRefresh: Boolean,
     ): CatalogLoad<CatalogPage> {
         val path = buildString {
@@ -210,6 +215,7 @@ class DefaultCatalogRepository(
             if (seasonId != null) append("/temporadas/").append(encode(seasonId))
             append("/videos.json?page=").append(page)
             if (completeOnly) append("&type=").append(TYPE_COMPLETE)
+            append("&order=").append(encode(order.apiValue))
         }
         return loadDocument(
             url = path,
@@ -221,6 +227,15 @@ class DefaultCatalogRepository(
     }
 
     private fun encode(segment: String): String = URLEncoder.encode(segment, "UTF-8")
+
+    /**
+     * Petición bloqueante de OkHttp en IO e interrumpible: al cancelar la corrutina
+     * (un refresh, salir de la pantalla) la conexión se corta en vez de seguir
+     * descargando y ocupando un hueco del pool.
+     */
+    private suspend fun fetchRaw(url: String): String = runInterruptible(Dispatchers.IO) { httpClient.get(url) }
+
+    private suspend fun fetchRaw(url: String, etag: String?): TextResponse = runInterruptible(Dispatchers.IO) { httpClient.fetch(url, etag) }
 
     private suspend fun <T> loadDocument(
         url: String,
@@ -245,7 +260,7 @@ class DefaultCatalogRepository(
 
         try {
             // Con copia local se revalida por ETag: un 304 no descarga nada.
-            val response = httpClient.fetch(url, cached?.etag)
+            val response = fetchRaw(url, cached?.etag)
             if (response.notModified && cached != null) {
                 cache.touch(url, now)
                 CatalogLoad(cachedValue ?: parse(cached.raw), isStale = false)
@@ -255,6 +270,8 @@ class DefaultCatalogRepository(
                 cache.write(url, raw, now, response.etag)
                 CatalogLoad(value, isStale = false)
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (networkError: Exception) {
             val fallback = if (age <= staleForMillis) cachedValue else null
             fallback?.let { CatalogLoad(it, isStale = true) } ?: throw networkError

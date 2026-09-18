@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -49,7 +50,7 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import es.openrtve.R
 import es.openrtve.domain.CatalogItem
-import es.openrtve.domain.ContentKind
+import es.openrtve.domain.LiveInfo
 import es.openrtve.domain.RowLayout
 import es.openrtve.domain.imageFor
 
@@ -79,13 +80,6 @@ internal fun RowLayout.cardWidth(): Dp = when (this) {
     RowLayout.HERO, RowLayout.FEATURED, RowLayout.LANDSCAPE, RowLayout.RANKED -> TvLandscapeWidth
     RowLayout.POSTER, RowLayout.POSTER_TALL -> TvPosterWidth
     RowLayout.SQUARE -> TvSquareWidth
-}
-
-internal fun RowLayout.aspectRatio(): Float = when (this) {
-    RowLayout.HERO, RowLayout.FEATURED, RowLayout.LANDSCAPE, RowLayout.RANKED -> 16f / 9f
-    RowLayout.POSTER -> 2f / 3f
-    RowLayout.POSTER_TALL -> 1f / 2f
-    RowLayout.SQUARE -> 1f
 }
 
 /**
@@ -212,48 +206,73 @@ internal fun TvItemCard(
     /** Posición en un ranking ("Lo más visto"); se pinta grande sobre la imagen. */
     rank: Int? = null,
 ) {
-    val image = item.imageFor(layout)
     val live = item.live
-    val now = LocalNowMillis.current
-    val context = LocalContext.current
-    val liveProgress = live?.takeIf { it.isOnAir }?.progressAt(now)
     Column(modifier) {
-        TvFocusSurface(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(layout.aspectRatio())) {
-            TvArtwork(image, Modifier.fillMaxSize())
-            live?.channelLogoUrl?.let { TvChannelLogo(it, Modifier.align(Alignment.TopStart)) }
-            rank?.let { TvRankBadge(it, Modifier.align(Alignment.BottomStart)) }
-            (progress ?: liveProgress)?.let { TvProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
-        }
-        Spacer(Modifier.height(10.dp))
-        when {
-            live == null -> Unit
-            live.isUpcomingAt(now) -> Text(
-                text = listOfNotNull(live.scheduleLabel(context, now), live.category).joinToString(" · "),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            else -> TvLiveDot()
-        }
-        Text(
-            text = item.title,
-            style = TvCardTitleStyle,
-            maxLines = if (layout.isVertical) 2 else 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (!layout.isVertical && (live == null || !live.isUpcomingAt(now))) {
-            item.subtitle?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        if (live == null) {
+            TvFocusSurface(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(layout.aspectRatio)) {
+                TvArtwork(item.imageFor(layout), Modifier.fillMaxSize())
+                rank?.let { TvRankBadge(it, Modifier.align(Alignment.BottomStart)) }
+                progress?.let { TvProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
             }
+            Spacer(Modifier.height(10.dp))
+            TvCardTitle(item.title, layout)
+            if (!layout.isVertical) item.subtitle?.let { TvCardSubtitle(it) }
+        } else {
+            TvLiveItemCard(item, live, layout, onClick, rank)
         }
     }
+}
+
+/**
+ * Cuerpo de la tarjeta de un directo. Solo aquí se lee el reloj compartido: así
+ * el tick de 30 s recompone las tarjetas de directos y no todas las demás.
+ */
+@Composable
+private fun ColumnScope.TvLiveItemCard(item: CatalogItem, live: LiveInfo, layout: RowLayout, onClick: () -> Unit, rank: Int?) {
+    val now = LocalNowMillis.current
+    val context = LocalContext.current
+    val upcoming = live.isUpcomingAt(now)
+    TvFocusSurface(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(layout.aspectRatio)) {
+        TvArtwork(item.imageFor(layout), Modifier.fillMaxSize())
+        live.channelLogoUrl?.let { TvChannelLogo(it, Modifier.align(Alignment.TopStart)) }
+        rank?.let { TvRankBadge(it, Modifier.align(Alignment.BottomStart)) }
+        live.takeIf { it.isOnAir }?.progressAt(now)?.let { TvProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
+    }
+    Spacer(Modifier.height(10.dp))
+    if (upcoming) {
+        Text(
+            text = listOfNotNull(live.scheduleLabel(context, now), live.category).joinToString(" · "),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    } else {
+        TvLiveDot()
+    }
+    TvCardTitle(item.title, layout)
+    if (!layout.isVertical && !upcoming) item.subtitle?.let { TvCardSubtitle(it) }
+}
+
+@Composable
+private fun TvCardTitle(title: String, layout: RowLayout) {
+    Text(
+        text = title,
+        style = TvCardTitleStyle,
+        maxLines = if (layout.isVertical) 2 else 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun TvCardSubtitle(subtitle: String) {
+    Text(
+        text = subtitle,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 /** Número de ranking sobre la esquina de la imagen. */
@@ -275,7 +294,7 @@ internal fun TvRankBadge(rank: Int, modifier: Modifier = Modifier) {
 @Composable
 internal fun TvSeeAllCard(layout: RowLayout, onClick: () -> Unit) {
     Column(Modifier.width(layout.cardWidth())) {
-        TvFocusSurface(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(layout.aspectRatio())) {
+        TvFocusSurface(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(layout.aspectRatio)) {
             Text(
                 text = stringResource(R.string.action_see_all),
                 style = MaterialTheme.typography.titleMedium,

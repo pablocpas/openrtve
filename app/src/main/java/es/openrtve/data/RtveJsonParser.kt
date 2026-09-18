@@ -21,6 +21,7 @@ import es.openrtve.domain.SpriteCue
 import es.openrtve.domain.ProgramDetail
 import es.openrtve.domain.ProgramSeason
 import es.openrtve.domain.RtveHostPolicy
+import es.openrtve.domain.seasonsInDisplayOrder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -214,9 +215,10 @@ class RtveJsonParser(
                     id = id,
                     title = season.text("longTitle", "shorttitle", "shortTitle", "title") ?: id,
                     episodeCount = season.number("numEpisodes"),
+                    order = season.number("orden"),
                 )
             }
-        return ProgramDetail(
+        val detail = ProgramDetail(
             id = program.text("id") ?: throw IllegalArgumentException("Programa sin id"),
             title = program.text("name", "title", "longTitle") ?: "",
             description = program.text("description", "longDescription", "promoDesc"),
@@ -227,7 +229,11 @@ class RtveJsonParser(
             webUrl = program.text("htmlUrl")?.let(hostPolicy::sanitize),
             isRadio = program.text("mainTopic")?.startsWith("Radio", ignoreCase = true) == true ||
                 program.text("htmlUrl")?.contains("/audios/") == true,
+            programTypeId = program.text("programTypeID"),
+            inEmission = program.flag("outOfEmission") != true,
+            isComplete = program.flag("isComplete") == true,
         )
+        return detail.copy(seasons = detail.seasonsInDisplayOrder())
     }
 
     fun parseVideoPage(raw: String): CatalogPage {
@@ -265,7 +271,9 @@ class RtveJsonParser(
 
     private fun toCatalogItem(item: JsonObject, mediaFirst: Boolean = false): CatalogItem? {
         val nestedMedia = item.obj("lastMultimedia")
-        if (nestedMedia != null && (mediaFirst || isContainer(item, nestedMedia))) {
+        // Sin id propio el item no es un programa: es una envoltura del medio que trae dentro.
+        val bareMedia = nestedMedia != null && item.text("id", "uid") == null
+        if (nestedMedia != null && (mediaFirst || bareMedia || isContainer(item, nestedMedia))) {
             val mediaItem = toCatalogItem(nestedMedia) ?: return null
             // Las previews del medio anidado repiten la imagen del programa; el
             // servicio de imágenes por id sí devuelve la propia del medio.

@@ -55,6 +55,47 @@ class NavigationViewModelTest {
     }
 
     @Test
+    fun `entry keys are stable per position and the visible one follows the stack`() {
+        assertEquals("HOME/root", state.currentKey)
+        viewModel.push(Destination.Settings)
+        viewModel.push(Destination.Video(catalogItem("v")))
+        assertEquals("HOME/1", state.currentKey)
+        assertEquals(setOf("HOME/root", "HOME/0", "HOME/1", "SEARCH/root", "EXPLORE/root"), state.liveKeys)
+        viewModel.pop()
+        assertEquals("HOME/0", state.currentKey)
+    }
+
+    @Test
+    fun `leaving an entry clears its ViewModelStore and the root stores survive`() {
+        viewModel.push(Destination.Settings)
+        val entryStore = viewModel.storeOwner(state.currentKey).viewModelStore
+        val rootStore = viewModel.storeOwner("HOME/root").viewModelStore
+        val entryModel = TrackedViewModel().also { entryStore.put("m", it) }
+        val rootModel = TrackedViewModel().also { rootStore.put("m", it) }
+
+        viewModel.pop()
+        assertTrue("el ViewModel de la ficha se libera al salir", entryModel.cleared)
+        assertFalse(rootModel.cleared)
+        assertTrue("una entrada nueva en la misma posición empieza de cero", viewModel.storeOwner("HOME/0").viewModelStore !== entryStore)
+
+        viewModel.push(Destination.Settings)
+        viewModel.push(Destination.Settings)
+        val nested = TrackedViewModel().also { viewModel.storeOwner("HOME/1").viewModelStore.put("m", it) }
+        viewModel.selectTab(Tab.HOME)
+        assertTrue("volver a la raíz libera toda la pila", nested.cleared)
+        assertFalse(rootModel.cleared)
+    }
+
+    private class TrackedViewModel : androidx.lifecycle.ViewModel() {
+        var cleared = false
+            private set
+
+        override fun onCleared() {
+            cleared = true
+        }
+    }
+
+    @Test
     fun `messages are shown once and dismissed`() {
         viewModel.show(UiMessage.Blocked(BlockReason.GEO_RESTRICTED))
         assertEquals(UiMessage.Blocked(BlockReason.GEO_RESTRICTED), state.message)

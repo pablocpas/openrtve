@@ -126,6 +126,26 @@ class SearchViewModelTest {
         assertNull("una búsqueda con éxito limpia el error", viewModel.uiState.value.error)
     }
 
+    @Test
+    fun `a failing quick filter is reported in place and can be retried`() = runTest(mainDispatcher.dispatcher) {
+        var failFilter = true
+        repository.quickFilterItems = { filter ->
+            if (failFilter) throw HttpStatusException(503) else loaded(CatalogModule(filter.title, listOf(catalogItem("${filter.title}-1"))))
+        }
+        val viewModel = SearchViewModel(repository)
+        advanceUntilIdle()
+
+        assertEquals(FilterState.Failed(LoadError.Http(503)), viewModel.uiState.value.filter)
+        assertNull("el fallo del filtro no es un aviso suelto", viewModel.uiState.value.error)
+        assertTrue(viewModel.uiState.value.filterItems.isEmpty())
+
+        failFilter = false
+        viewModel.retryFilter()
+        assertEquals(FilterState.Loading, viewModel.uiState.value.filter)
+        advanceUntilIdle()
+        assertEquals(listOf("Más buscados-1"), viewModel.uiState.value.filterItems.map { it.id })
+    }
+
     private companion object {
         val FILTER_TOP = QuickFilter("Más buscados", "https://recomsys.rtve.es/tops")
         val FILTER_SERIES = QuickFilter("Series", "https://www.rtve.es/api/series.json")
