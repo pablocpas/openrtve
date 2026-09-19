@@ -118,7 +118,7 @@ private fun trackLabel(context: Context, format: Format): String {
         language == "qaa" -> context.getString(R.string.player_track_original)
         language == "ads" || format.roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO != 0 -> context.getString(R.string.player_track_audio_description)
         language == null || language == "und" -> format.label ?: context.getString(R.string.player_track_unknown)
-        else -> Locale(language).getDisplayLanguage(Locale.getDefault()).replaceFirstChar { it.uppercase() }
+        else -> Locale.forLanguageTag(language).getDisplayLanguage(Locale.getDefault()).replaceFirstChar { it.uppercase() }
     }
     val forced = format.selectionFlags and C.SELECTION_FLAG_FORCED != 0
     return if (forced) "$base (${context.getString(R.string.player_track_forced)})" else base

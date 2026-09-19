@@ -3,6 +3,7 @@ package es.openrtve.data
 import es.openrtve.domain.RtveUrls
 import java.io.IOException
 import java.nio.file.Files
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -110,6 +111,24 @@ class CatalogRepositoryTest {
             fail("expected the network error")
         } catch (error: IOException) {
             assertEquals("offline", error.message)
+        }
+    }
+
+    @Test
+    fun `radio source lookup does not swallow cancellation`() = runBlocking {
+        client.response = {
+            if (client.calls == 1) {
+                """{"title":"Radio","rows":[{"title":"Directos","moduleType":"moduloDirectoRadio","tipo":"moduloDirectoRadio"}]}"""
+            } else {
+                throw CancellationException("cancelled")
+            }
+        }
+
+        try {
+            repository.loadPortada(RtveUrls.TV_HOME)
+            fail("expected cancellation")
+        } catch (cancelled: CancellationException) {
+            assertEquals("cancelled", cancelled.message)
         }
     }
 

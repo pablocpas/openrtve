@@ -239,6 +239,8 @@ private fun InfoLine(label: String, value: String?) {
 }
 
 private fun languageName(code: String): String =
-    java.util.Locale(code).getDisplayLanguage(java.util.Locale("es")).replaceFirstChar { it.uppercase() }
+    java.util.Locale.forLanguageTag(code)
+        .getDisplayLanguage(java.util.Locale.forLanguageTag("es"))
+        .replaceFirstChar { it.uppercase() }
 
 private val BackdropHeight = 288.dp

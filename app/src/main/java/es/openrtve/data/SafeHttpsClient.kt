@@ -61,8 +61,7 @@ class SafeHttpsClient(
                     }
                     !response.isSuccessful -> throw HttpStatusException(response.code)
                     else -> {
-                        val body = response.body ?: throw IOException("Respuesta sin cuerpo")
-                        val source = body.source()
+                        val source = response.body.source()
                         if (source.request(maxPayloadBytes + 1)) throw IOException("Respuesta demasiado grande")
                         return TextResponse(body = source.readUtf8(), etag = response.header("ETag"))
                     }

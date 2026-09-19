@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -23,14 +24,16 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.OpenRTVE"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="false"
+        tools:targetApi="n">
 
         <activity
             android:name=".playback.PlayerActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode"
             android:exported="false"
             android:launchMode="singleTop"
-            android:supportsPictureInPicture="true" />
+            android:supportsPictureInPicture="true"
+            tools:targetApi="o" />
 
         <activity
             android:name=".ui.tv.TvActivity"
@@ -45,8 +48,7 @@
         <activity
             android:name=".ui.mobile.MainActivity"
             android:exported="true"
-            android:launchMode="singleTask"
-            android:screenOrientation="userPortrait">
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -82,10 +84,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Media3 exige que el servicio sea visible para controladores externos;
+             MediaSession valida cada conexión en tiempo de ejecución. -->
         <service
             android:name=".playback.PlaybackService"
             android:exported="true"
-            android:foregroundServiceType="mediaPlayback">
+            android:foregroundServiceType="mediaPlayback"
+            tools:ignore="ExportedService">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
                 <action android:name="android.media.browse.MediaBrowserService" />

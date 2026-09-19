@@ -5,7 +5,6 @@ import android.app.PictureInPictureParams
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.os.Build
@@ -190,7 +189,7 @@ class PlayerActivity : ComponentActivity() {
                     locked = locked,
                     showUnlock = showUnlock && !inPictureInPicture,
                     feedback = feedback,
-                    canPictureInPicture = canEnterPictureInPicture() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O,
+                    canPictureInPicture = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && canEnterPictureInPicture(),
                     onBack = ::finish,
                     onPictureInPicture = ::enterPictureInPictureNow,
                     onLock = { locked = true; showUnlock = true },
@@ -395,8 +394,24 @@ class PlayerActivity : ComponentActivity() {
         nextCountdown = null
         if (videoId == null) return
         extrasJob = lifecycleScope.launch {
-            launch { sprite = runCatching { container.catalogRepository.loadPreviewSprite(videoId) }.getOrNull() }
-            launch { nextItem = runCatching { container.catalogRepository.loadNextVideo(videoId) }.getOrNull() }
+            launch {
+                sprite = try {
+                    container.catalogRepository.loadPreviewSprite(videoId)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            launch {
+                nextItem = try {
+                    container.catalogRepository.loadNextVideo(videoId)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+            }
         }
     }
 
@@ -445,12 +460,9 @@ class PlayerActivity : ComponentActivity() {
         val isVideo = request?.isAudioOnly == false
         // Solo el audio sigue en segundo plano con notificación; el vídeo no la necesita.
         if (request?.isAudioOnly == true) requestNotificationPermissionIfNeeded()
-        // Vídeo en horizontal (sigue al sensor entre las dos orientaciones apaisadas); audio en la orientación normal.
-        requestedOrientation = if (isVideo) {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        }
+        // La actividad sigue la orientación elegida por el usuario. Así el vídeo puede
+        // verse apaisado al girar el dispositivo sin forzar esa orientación al catálogo
+        // cuando se cierra el reproductor, y la app sigue siendo adaptable en pantallas grandes.
         val insets = WindowCompat.getInsetsController(window, window.decorView)
         if (isVideo) {
             insets.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -486,6 +498,7 @@ class PlayerActivity : ComponentActivity() {
                 if (playerView?.videoSurfaceView?.getGlobalVisibleRect(rect) == true) setSourceRectHint(rect)
             }
 
+    @RequiresApi(Build.VERSION_CODES.N)
     private fun canEnterPictureInPicture(): Boolean =
         request?.isAudioOnly == false &&
             packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)

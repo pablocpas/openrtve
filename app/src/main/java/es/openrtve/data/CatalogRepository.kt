@@ -83,7 +83,7 @@ class DefaultCatalogRepository(
         )
         // El módulo de emisoras de radio no trae fuente: se toma de la configuración remota.
         if (feed.value.rows.none { it.isRadioLivesModule && it.contentUrl == null }) return feed
-        val livesUrl = runCatching {
+        val livesUrl = try {
             loadDocument(
                 url = RtveUrls.REMOTE_CONFIG,
                 forceRefresh = false,
@@ -92,7 +92,11 @@ class DefaultCatalogRepository(
                 cachedOnly = cachedOnly,
                 parse = parser::parseRadioLivesUrl,
             ).value
-        }.getOrNull() ?: return feed
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            return feed
+        }
         return feed.copy(
             value = feed.value.copy(
                 rows = feed.value.rows.map { row ->

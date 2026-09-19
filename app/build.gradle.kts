@@ -63,8 +63,8 @@ android {
 
     // Fakes y fixtures que usan tanto los tests JVM como los instrumentados.
     sourceSets {
-        getByName("test").kotlin.srcDir("src/sharedTest/java")
-        getByName("androidTest").kotlin.srcDir("src/sharedTest/java")
+        getByName("test").kotlin.directories += "src/sharedTest/java"
+        getByName("androidTest").kotlin.directories += "src/sharedTest/java"
     }
 }
 
