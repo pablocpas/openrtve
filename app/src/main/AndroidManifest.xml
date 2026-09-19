@@ -35,10 +35,14 @@
             android:supportsPictureInPicture="true"
             tools:targetApi="o" />
 
+        <!-- Launcher exclusivo de Android TV: su checklist exige landscape;
+             no se aplica a la actividad móvil ni al reproductor adaptable. -->
         <activity
             android:name=".ui.tv.TvActivity"
             android:exported="true"
-            android:launchMode="singleTask">
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            tools:ignore="DiscouragedApi">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />

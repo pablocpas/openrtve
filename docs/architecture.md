@@ -32,7 +32,10 @@ UI ─> PlaybackResolver ─> PlayerActivity ─> MediaController
   entrada (clave `pestaña/posición` o `global/ajustes`) tiene su
   propio `ViewModelStore`, que se libera al salir de ella, y `DestinationHost`
   la envuelve en un `SaveableStateHolder`: al volver atrás se recuperan scroll y
-  foco, y los ViewModels de las fichas no se acumulan durante la sesión.
+  foco, y los ViewModels de las fichas no se acumulan durante la sesión. Las
+  rutas mínimas (pestaña, pilas y destino global) también se escriben en un
+  `SavedStateHandle`, por lo que Android puede reconstruirlas tras matar el
+  proceso; los datos completos se vuelven a cargar desde el repositorio.
 - La presentación de cada fila (`RowLayout`) se deduce del `tipo` editorial
   en el parser; la UI solo decide tamaños.
 - La portada carga cada fila por separado (máximo seis en paralelo) para
@@ -56,8 +59,9 @@ UI ─> PlaybackResolver ─> PlayerActivity ─> MediaController
 
 Datos, estado y política son comunes. Las superficies no lo son:
 
-- móvil usa Material 3, ventana edge-to-edge y navegación adaptativa: barra
-  inferior en ventanas compactas y rail lateral desde el ancho medio;
+- móvil usa Material 3, ventana edge-to-edge y `NavigationSuiteScaffold`: la
+  navegación cambia entre barra inferior y rail según el tamaño y la postura
+  de ventana que calcula Material, incluidos multiventana y plegables;
 - TV sigue las guías de Compose for TV (patrón de la muestra JetStream):
   `NavigationDrawer` en el borde izquierdo, `Carousel` destacado en la portada,
   filas con `focusRestorer`, tarjetas que escalan al enfocar, márgenes de
@@ -69,9 +73,10 @@ Datos, estado y política son comunes. Las superficies no lo son:
   volver desde la notificación reanuda en vez de reiniciar. PiP y pantalla
   inmersiva se activan solo para vídeo.
 
-No se bloquea la orientación. La actividad elegida por el launcher determina
-móvil/TV y cada shell responde al espacio disponible; el reproductor respeta la
-rotación elegida por el usuario y no deja el catálogo forzado en horizontal.
+La actividad móvil y el reproductor no bloquean la orientación: responden al
+espacio disponible y respetan la rotación elegida por el usuario. Solo el
+launcher exclusivo de Android TV declara `landscape`, como exige la checklist
+de publicación de TV.
 
 ## Arranque
 

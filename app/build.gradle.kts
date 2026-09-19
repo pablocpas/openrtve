@@ -7,7 +7,8 @@ plugins {
 }
 
 // Firma de release desde keystore.properties (fuera del repositorio). Sin él,
-// el release se firma con la clave de depuración para que siga siendo instalable.
+// Gradle genera un APK release sin firmar: nunca se sustituye silenciosamente
+// por la clave de depuración.
 val keystoreProperties = rootProject.file("keystore.properties")
     .takeIf { it.isFile }
     ?.let { file -> Properties().apply { file.inputStream().use(::load) } }
@@ -44,7 +45,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
 
@@ -78,6 +79,7 @@ dependencies {
     implementation(composeBom)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)

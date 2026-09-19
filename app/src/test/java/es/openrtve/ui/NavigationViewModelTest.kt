@@ -1,9 +1,12 @@
 package es.openrtve.ui
 
+import androidx.lifecycle.SavedStateHandle
 import es.openrtve.domain.BlockReason
 import es.openrtve.domain.ContentKind
 import es.openrtve.domain.HomeLink
+import es.openrtve.domain.HomeRow
 import es.openrtve.domain.LinkKind
+import es.openrtve.domain.RowLayout
 import es.openrtve.testing.catalogItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -12,7 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NavigationViewModelTest {
-    private val viewModel = NavigationViewModel()
+    private val viewModel = NavigationViewModel(SavedStateHandle())
     private val state get() = viewModel.state.value
 
     @Test
@@ -139,6 +142,56 @@ class NavigationViewModelTest {
         assertEquals(video, state.current)
         viewModel.pop()
         assertNull("atrás vuelve al inicio fijo", state.current)
+    }
+
+    @Test
+    fun `tab stacks and global destination survive process recreation`() {
+        val savedState = SavedStateHandle()
+        val original = NavigationViewModel(savedState)
+        val program = Destination.Program(catalogItem("programa"))
+        val category = Destination.Portada("https://www.rtve.es/play/cine/index_apps.json", "Cine")
+
+        original.push(program)
+        original.selectTab(Tab.EXPLORE)
+        original.push(category)
+        original.openGlobal(GlobalDestination.Settings)
+
+        val restored = NavigationViewModel(savedState)
+        assertEquals(Tab.EXPLORE, restored.state.value.tab)
+        assertEquals(GlobalDestination.Settings, restored.state.value.current)
+        assertEquals(listOf(program), restored.state.value.stacks.getValue(Tab.HOME))
+        assertEquals(listOf(category), restored.state.value.stacks.getValue(Tab.EXPLORE))
+
+        restored.pop()
+        assertEquals(category, restored.state.value.current)
+    }
+
+    @Test
+    fun `module and media routes retain the identifiers needed to reload`() {
+        val savedState = SavedStateHandle()
+        val original = NavigationViewModel(savedState)
+        val module = Destination.Module(
+            row = HomeRow(
+                id = 7,
+                title = "Colección",
+                order = 2,
+                moduleType = "Collection",
+                presentation = "ColeccionPoster",
+                contentUrl = "https://api.rtve.es/api/collection/7.json",
+                layout = RowLayout.POSTER,
+                links = listOf(HomeLink("RTVE", null, "https://www.rtve.es/play/", LinkKind.PORTADA)),
+            ),
+            title = "Ver todo",
+        )
+        val audio = Destination.Video(
+            catalogItem("audio", kind = ContentKind.AUDIO, programId = "programa")
+                .copy(imageUrl = "https://img.rtve.es/audio.jpg"),
+        )
+
+        original.push(module)
+        original.push(audio)
+
+        assertEquals(listOf(module, audio), NavigationViewModel(savedState).state.value.stack)
     }
 
     private class TrackedViewModel : androidx.lifecycle.ViewModel() {

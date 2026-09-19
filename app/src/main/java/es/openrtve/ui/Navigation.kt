@@ -1,5 +1,6 @@
 package es.openrtve.ui
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
@@ -100,8 +101,8 @@ data class NavigationState(
  * Cada entrada tiene su propio [ViewModelStore], que se libera al salir de la
  * pila: así los ViewModels de las fichas no se acumulan durante toda la sesión.
  */
-class NavigationViewModel : ViewModel() {
-    private val mutableState = MutableStateFlow(NavigationState())
+class NavigationViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel() {
+    private val mutableState = MutableStateFlow(savedStateHandle.restoreNavigationState())
     val state: StateFlow<NavigationState> = mutableState.asStateFlow()
 
     private val stores = mutableMapOf<String, EntryStoreOwner>()
@@ -113,30 +114,37 @@ class NavigationViewModel : ViewModel() {
         override val viewModelStore = ViewModelStore()
     }
 
+    private fun navigate(state: NavigationState) {
+        mutableState.value = state
+        savedStateHandle.saveNavigationState(state)
+    }
+
     fun selectTab(tab: Tab) {
         val current = mutableState.value
         // Un destino global se cierra al elegir cualquier pestaña. Si se elige
         // la que había debajo, se recupera exactamente su posición y su pila.
         if (current.global != null) {
-            mutableState.value = current.copy(tab = tab, global = null)
+            navigate(current.copy(tab = tab, global = null))
             release(globalEntryKey(current.global))
             return
         }
         if (current.tab != tab) {
-            mutableState.value = current.copy(tab = tab)
+            navigate(current.copy(tab = tab))
             return
         }
         // Repetir la pestaña activa vuelve a su raíz, como en las apps M3.
-        mutableState.value = current.copy(stacks = current.stacks + (tab to emptyList()))
+        navigate(current.copy(stacks = current.stacks + (tab to emptyList())))
         current.stack.indices.forEach { release(entryKey(tab, it)) }
     }
 
     fun push(destination: Destination) {
         val current = mutableState.value
         current.global?.let { release(globalEntryKey(it)) }
-        mutableState.value = current.copy(
-            stacks = current.stacks + (current.tab to current.stack + destination),
-            global = null,
+        navigate(
+            current.copy(
+                stacks = current.stacks + (current.tab to current.stack + destination),
+                global = null,
+            ),
         )
     }
 
@@ -144,7 +152,7 @@ class NavigationViewModel : ViewModel() {
         val current = mutableState.value
         if (current.global == destination) return
         current.global?.let { release(globalEntryKey(it)) }
-        mutableState.value = current.copy(global = destination)
+        navigate(current.copy(global = destination))
     }
 
     /**
@@ -158,22 +166,24 @@ class NavigationViewModel : ViewModel() {
             stack.indices.forEach { release(entryKey(tab, it)) }
         }
         val emptyStacks = Tab.entries.associateWith { emptyList<Destination>() }
-        mutableState.value = current.copy(
-            tab = Tab.HOME,
-            stacks = emptyStacks + (Tab.HOME to listOf(destination)),
-            global = null,
+        navigate(
+            current.copy(
+                tab = Tab.HOME,
+                stacks = emptyStacks + (Tab.HOME to listOf(destination)),
+                global = null,
+            ),
         )
     }
 
     fun pop() {
         val current = mutableState.value
         if (current.global != null) {
-            mutableState.value = current.copy(global = null)
+            navigate(current.copy(global = null))
             release(globalEntryKey(current.global))
             return
         }
         if (current.stack.isEmpty()) return
-        mutableState.value = current.copy(stacks = current.stacks + (current.tab to current.stack.dropLast(1)))
+        navigate(current.copy(stacks = current.stacks + (current.tab to current.stack.dropLast(1))))
         release(current.currentKey)
     }
 
