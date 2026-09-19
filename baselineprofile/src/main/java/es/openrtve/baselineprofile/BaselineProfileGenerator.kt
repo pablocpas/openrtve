@@ -9,19 +9,29 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Recorre los flujos principales para que ART precompile sus clases y métodos:
- * portada, scroll, Explorar, una categoría, una ficha y el reproductor.
- */
+/** Genera por separado el arranque (layout del DEX) y los recorridos que ART precompila. */
 @RunWith(AndroidJUnit4::class)
 class BaselineProfileGenerator {
     @get:Rule
     val rule = BaselineProfileRule()
 
     @Test
-    fun generate() = rule.collect(
+    fun startup() = rule.collect(
         packageName = PACKAGE,
         includeInStartupProfile = true,
+        maxIterations = 5,
+    ) {
+        pressHome()
+        startActivityAndWait()
+        device.wait(Until.hasObject(By.textContains("Explorar")), 15_000)
+        device.waitForIdle()
+    }
+
+    /** Portada, scroll, Explorar, una categoría, búsqueda, una ficha y el reproductor. */
+    @Test
+    fun criticalUserJourneys() = rule.collect(
+        packageName = PACKAGE,
+        includeInStartupProfile = false,
         maxIterations = 5,
     ) {
         pressHome()
@@ -36,8 +46,8 @@ class BaselineProfileGenerator {
         }
         // Explorar y una categoría.
         device.findObject(By.text("Explorar"))?.click()
-        device.wait(Until.hasObject(By.textContains("Temáticas")), 10_000)
-        device.findObject(By.textContains("CINE"))?.click()
+        device.wait(Until.hasObject(By.text("CINE")), 10_000)
+        device.findObject(By.text("CINE"))?.click()
         device.wait(Until.hasObject(By.textContains("Directos")), 15_000)
         device.waitForIdle()
         device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 4, 20)
@@ -47,8 +57,11 @@ class BaselineProfileGenerator {
         device.wait(Until.hasObject(By.textContains("SERIES")), 10_000)
         device.findObject(By.textContains("SERIES"))?.click()
         device.waitForIdle()
-        // Reproductor: primer resultado -> ficha -> reproducir.
-        device.findObjects(By.clickable(true)).drop(4).firstOrNull()?.click()
+        // Ficha y reproductor mediante un programa estable: no dependemos del orden
+        // cambiante de las tarjetas editoriales ni de los resultados del filtro.
+        device.executeShellCommand(
+            "am start -W -a android.intent.action.VIEW -d $PROGRAM_DEEP_LINK $PACKAGE/.ui.mobile.MainActivity",
+        )
         device.wait(Until.hasObject(By.textContains("Reproducir")), 15_000)
         device.findObject(By.textContains("Reproducir"))?.click()
         device.wait(Until.hasObject(By.res(PACKAGE, "player_settings")), 15_000)
@@ -59,5 +72,6 @@ class BaselineProfileGenerator {
 
     private companion object {
         const val PACKAGE = "es.openrtve"
+        const val PROGRAM_DEEP_LINK = "https://www.rtve.es/play/videos/la-promesa/"
     }
 }
