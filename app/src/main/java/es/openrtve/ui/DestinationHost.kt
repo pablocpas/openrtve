@@ -18,7 +18,7 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 fun DestinationHost(
     nav: NavigationState,
     navigation: NavigationViewModel,
-    content: @Composable (Destination?) -> Unit,
+    content: @Composable (AppDestination?) -> Unit,
 ) {
     val holder = rememberSaveableStateHolder()
     val shown = remember { mutableSetOf<String>() }

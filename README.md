@@ -138,7 +138,7 @@ comportamiento:
 
 - `data`: cliente HTTPS sobre OkHttp, parser JSON tolerante, caché y repositorio;
 - `domain`: modelos, allowlist de hosts y política de reproducción;
-- `ui`: navegación (una pila por pestaña), un ViewModel por pantalla y textos;
+- `ui`: navegación (una pila por pestaña y Ajustes global), un ViewModel por pantalla y textos;
 - `ui/mobile` y `ui/tv`: los dos árboles de interfaz, que comparten todo lo demás;
 - `playback`: ExoPlayer, `MediaSessionService`, controles y gestos.
 

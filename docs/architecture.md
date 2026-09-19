@@ -7,7 +7,7 @@ paquetes y por dirección de dependencias, no por una colección de módulos
 Gradle vacíos:
 
 ```text
-UI móvil ─┐  NavigationViewModel (pestaña + pila de Destination)
+UI móvil ─┐  NavigationViewModel (una pila por pestaña + destino global)
           ├──> PortadaViewModel ──┐
 UI TV ────┘    ModuleViewModel   ├─> CatalogRepository ─> HTTPS + caché
                ProgramViewModel  │
@@ -24,9 +24,12 @@ UI ─> PlaybackResolver ─> PlayerActivity ─> MediaController
   y lo comparten móvil y TV; las pantallas solo pintan. Las acciones comunes
   (abrir fichas, reproducir o explicar por qué no, mensajes) están en
   `CatalogActions`.
-- Navegación propia: tres pestañas y una pila de destinos por pestaña en
-  `NavigationViewModel`. Una librería de navegación no aporta nada con tres
-  tipos de destino. Cada entrada de la pila (clave `pestaña/posición`) tiene su
+- Navegación propia y pequeña, siguiendo los principios de Navigation de
+  Android: Inicio es el destino inicial fijo y cada una de las tres pestañas
+  conserva su pila. Ajustes es un destino global y nunca se guarda dentro de
+  una pestaña; elegir una pestaña lo cierra y recupera la posición anterior.
+  Los enlaces externos construyen una pila sintética `Inicio -> ficha`. Cada
+  entrada (clave `pestaña/posición` o `global/ajustes`) tiene su
   propio `ViewModelStore`, que se libera al salir de ella, y `DestinationHost`
   la envuelve en un `SaveableStateHolder`: al volver atrás se recuperan scroll y
   foco, y los ViewModels de las fichas no se acumulan durante la sesión.
@@ -53,7 +56,8 @@ UI ─> PlaybackResolver ─> PlayerActivity ─> MediaController
 
 Datos, estado y política son comunes. Las superficies no lo son:
 
-- móvil usa Material 3, ventana edge-to-edge y rejilla adaptativa;
+- móvil usa Material 3, ventana edge-to-edge y navegación adaptativa: barra
+  inferior en ventanas compactas y rail lateral desde el ancho medio;
 - TV sigue las guías de Compose for TV (patrón de la muestra JetStream):
   `NavigationDrawer` en el borde izquierdo, `Carousel` destacado en la portada,
   filas con `focusRestorer`, tarjetas que escalan al enfocar, márgenes de
@@ -65,8 +69,9 @@ Datos, estado y política son comunes. Las superficies no lo son:
   volver desde la notificación reanuda en vez de reiniciar. PiP y pantalla
   inmersiva se activan solo para vídeo.
 
-No se decide la UI por orientación o por un ancho fijo. La actividad elegida
-por el launcher determina móvil/TV y cada shell responde al espacio disponible.
+No se bloquea la orientación. La actividad elegida por el launcher determina
+móvil/TV y cada shell responde al espacio disponible; el reproductor respeta la
+rotación elegida por el usuario y no deja el catálogo forzado en horizontal.
 
 ## Arranque
 

@@ -62,11 +62,11 @@ class CatalogActions(
         navigation.push(Destination.Program(referenceItem(id, ContentKind.PROGRAM, title)))
     }
 
-    val openSettings: () -> Unit = { navigation.push(Destination.Settings) }
+    val openSettings: () -> Unit = { navigation.openGlobal(GlobalDestination.Settings) }
 
     val showMessage: (String) -> Unit = { navigation.show(UiMessage.Text(it)) }
 
-    /** Enlace recibido (VIEW o Compartir), ya resuelto por red: se abre como cualquier item. */
+    /** Enlace recibido (VIEW o Compartir): construye Inicio -> ficha, como una navegación manual. */
     suspend fun openIncomingLink(url: String) {
         val item = try {
             container.deepLinkResolver.resolve(url)
@@ -75,7 +75,15 @@ class CatalogActions(
         } catch (_: Exception) {
             null
         }
-        if (item == null) navigation.show(UiMessage.LinkNotFound) else openItem(item)
+        if (item == null) {
+            navigation.show(UiMessage.LinkNotFound)
+            return
+        }
+        when (item.kind) {
+            ContentKind.PROGRAM -> navigation.openDeepLink(Destination.Program(item))
+            ContentKind.VIDEO, ContentKind.AUDIO -> navigation.openDeepLink(Destination.Video(item))
+            else -> play(item)
+        }
     }
 }
 

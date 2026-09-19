@@ -19,13 +19,20 @@ import kotlinx.coroutines.flow.asStateFlow
 
 enum class Tab { HOME, SEARCH, EXPLORE }
 
+/** Cualquier pantalla que puede ocupar el host principal. */
+sealed interface AppDestination
+
 /** Pantallas apilables sobre la raíz de cada pestaña. */
-sealed interface Destination {
+sealed interface Destination : AppDestination {
     data class Portada(val url: String, val title: String) : Destination
     data class Module(val row: HomeRow, val title: String) : Destination
     data class Program(val item: CatalogItem) : Destination
     data class Video(val item: CatalogItem) : Destination
-    data object Settings : Destination
+}
+
+/** Pantallas globales: no pertenecen ni se guardan en la pila de una pestaña. */
+sealed interface GlobalDestination : AppDestination {
+    data object Settings : GlobalDestination
 }
 
 /** Una categoría abre su portada; un canal temático, la lista con su directo. */
@@ -61,26 +68,34 @@ sealed interface UiMessage {
  */
 fun entryKey(tab: Tab, index: Int): String = if (index < 0) "$tab/root" else "$tab/$index"
 
+fun globalEntryKey(destination: GlobalDestination): String = when (destination) {
+    GlobalDestination.Settings -> "global/settings"
+}
+
 data class NavigationState(
     val tab: Tab = Tab.HOME,
     val stacks: Map<Tab, List<Destination>> = Tab.entries.associateWith { emptyList() },
+    val global: GlobalDestination? = null,
     val message: UiMessage? = null,
 ) {
     val stack: List<Destination> get() = stacks.getValue(tab)
-    val current: Destination? get() = stack.lastOrNull()
-    val canGoBack: Boolean get() = stack.isNotEmpty()
+    val current: AppDestination? get() = global ?: stack.lastOrNull()
+    val canGoBack: Boolean get() = global != null || stack.isNotEmpty()
 
     /** Clave de la pantalla visible. */
-    val currentKey: String get() = entryKey(tab, stack.lastIndex)
+    val currentKey: String get() = global?.let(::globalEntryKey) ?: entryKey(tab, stack.lastIndex)
 
     /** Claves de todas las entradas vivas, en cualquier pestaña. */
     val liveKeys: Set<String>
-        get() = stacks.flatMapTo(mutableSetOf()) { (tab, stack) -> (-1 until stack.size).map { entryKey(tab, it) } }
+        get() = stacks
+            .flatMapTo(mutableSetOf()) { (tab, stack) -> (-1 until stack.size).map { entryKey(tab, it) } }
+            .apply { global?.let { add(globalEntryKey(it)) } }
 }
 
 /**
- * Navegación con barra inferior y una pila por pestaña. Sin librería de
- * navegación: tres pestañas y tres tipos de destino no la justifican.
+ * Navegación con una pila por pestaña y destinos globales. La implementación
+ * conserva las mismas invariantes que Navigation: inicio fijo, pilas
+ * independientes, back predecible y deep links con pila sintética.
  *
  * Cada entrada tiene su propio [ViewModelStore], que se libera al salir de la
  * pila: así los ViewModels de las fichas no se acumulan durante toda la sesión.
@@ -100,6 +115,13 @@ class NavigationViewModel : ViewModel() {
 
     fun selectTab(tab: Tab) {
         val current = mutableState.value
+        // Un destino global se cierra al elegir cualquier pestaña. Si se elige
+        // la que había debajo, se recupera exactamente su posición y su pila.
+        if (current.global != null) {
+            mutableState.value = current.copy(tab = tab, global = null)
+            release(globalEntryKey(current.global))
+            return
+        }
         if (current.tab != tab) {
             mutableState.value = current.copy(tab = tab)
             return
@@ -111,11 +133,45 @@ class NavigationViewModel : ViewModel() {
 
     fun push(destination: Destination) {
         val current = mutableState.value
-        mutableState.value = current.copy(stacks = current.stacks + (current.tab to current.stack + destination))
+        current.global?.let { release(globalEntryKey(it)) }
+        mutableState.value = current.copy(
+            stacks = current.stacks + (current.tab to current.stack + destination),
+            global = null,
+        )
+    }
+
+    fun openGlobal(destination: GlobalDestination) {
+        val current = mutableState.value
+        if (current.global == destination) return
+        current.global?.let { release(globalEntryKey(it)) }
+        mutableState.value = current.copy(global = destination)
+    }
+
+    /**
+     * Un enlace externo crea una pila sintética alcanzable de forma normal:
+     * Inicio -> destino. No hereda la pestaña ni la pila que estuvieran visibles.
+     */
+    fun openDeepLink(destination: Destination) {
+        val current = mutableState.value
+        current.global?.let { release(globalEntryKey(it)) }
+        current.stacks.forEach { (tab, stack) ->
+            stack.indices.forEach { release(entryKey(tab, it)) }
+        }
+        val emptyStacks = Tab.entries.associateWith { emptyList<Destination>() }
+        mutableState.value = current.copy(
+            tab = Tab.HOME,
+            stacks = emptyStacks + (Tab.HOME to listOf(destination)),
+            global = null,
+        )
     }
 
     fun pop() {
         val current = mutableState.value
+        if (current.global != null) {
+            mutableState.value = current.copy(global = null)
+            release(globalEntryKey(current.global))
+            return
+        }
         if (current.stack.isEmpty()) return
         mutableState.value = current.copy(stacks = current.stacks + (current.tab to current.stack.dropLast(1)))
         release(current.currentKey)

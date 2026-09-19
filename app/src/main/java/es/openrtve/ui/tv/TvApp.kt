@@ -38,6 +38,7 @@ import es.openrtve.R
 import es.openrtve.domain.RtveUrls
 import es.openrtve.ui.Destination
 import es.openrtve.ui.DestinationHost
+import es.openrtve.ui.GlobalDestination
 import es.openrtve.ui.LocalNowMillis
 import es.openrtve.ui.NavigationViewModel
 import es.openrtve.ui.Tab
@@ -87,11 +88,11 @@ fun TvApp(container: AppContainer, incomingLinks: Flow<String> = emptyFlow()) {
                         .padding(12.dp),
                 ) {
                     Spacer(Modifier.height(TvVerticalMargin))
-                    DrawerEntry(Icons.Filled.Home, stringResource(R.string.tab_home), nav.tab == Tab.HOME && destination == null) { navigation.selectTab(Tab.HOME) }
-                    DrawerEntry(Icons.Filled.Search, stringResource(R.string.tab_search), nav.tab == Tab.SEARCH && destination == null) { navigation.selectTab(Tab.SEARCH) }
-                    DrawerEntry(Icons.Filled.Menu, stringResource(R.string.tab_explore), nav.tab == Tab.EXPLORE && destination == null) { navigation.selectTab(Tab.EXPLORE) }
-                    DrawerEntry(Icons.Filled.Settings, stringResource(R.string.settings_title), destination == Destination.Settings) {
-                        if (destination != Destination.Settings) actions.openSettings()
+                    DrawerEntry(Icons.Filled.Home, stringResource(R.string.tab_home), nav.global == null && nav.tab == Tab.HOME) { navigation.selectTab(Tab.HOME) }
+                    DrawerEntry(Icons.Filled.Search, stringResource(R.string.tab_search), nav.global == null && nav.tab == Tab.SEARCH) { navigation.selectTab(Tab.SEARCH) }
+                    DrawerEntry(Icons.Filled.Menu, stringResource(R.string.tab_explore), nav.global == null && nav.tab == Tab.EXPLORE) { navigation.selectTab(Tab.EXPLORE) }
+                    DrawerEntry(Icons.Filled.Settings, stringResource(R.string.settings_title), destination == GlobalDestination.Settings) {
+                        if (destination != GlobalDestination.Settings) actions.openSettings()
                     }
                 }
             },
@@ -133,7 +134,7 @@ fun TvApp(container: AppContainer, incomingLinks: Flow<String> = emptyFlow()) {
                             onOpenProgram = actions.openProgram,
                             onError = actions.showMessage,
                         )
-                        Destination.Settings -> TvSettingsScreen(container, onMessage = actions.showMessage)
+                        GlobalDestination.Settings -> TvSettingsScreen(container, onMessage = actions.showMessage)
                         null -> when (nav.tab) {
                             Tab.HOME -> TvPortadaScreen(
                                 repository = repository,

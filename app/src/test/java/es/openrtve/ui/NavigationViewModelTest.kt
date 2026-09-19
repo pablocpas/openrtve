@@ -20,9 +20,10 @@ class NavigationViewModelTest {
         val program = Destination.Program(catalogItem("p"))
         viewModel.push(program)
         viewModel.selectTab(Tab.SEARCH)
-        viewModel.push(Destination.Settings)
+        val video = Destination.Video(catalogItem("v"))
+        viewModel.push(video)
 
-        assertEquals(listOf(Destination.Settings), state.stack)
+        assertEquals(listOf(video), state.stack)
         viewModel.selectTab(Tab.HOME)
         assertEquals(listOf(program), state.stack)
         assertEquals(program, state.current)
@@ -31,10 +32,11 @@ class NavigationViewModelTest {
 
     @Test
     fun `pop removes the top and is harmless on an empty stack`() {
-        viewModel.push(Destination.Settings)
+        val program = Destination.Program(catalogItem("p"))
+        viewModel.push(program)
         viewModel.push(Destination.Video(catalogItem("v")))
         viewModel.pop()
-        assertEquals(listOf(Destination.Settings), state.stack)
+        assertEquals(listOf(program), state.stack)
         viewModel.pop()
         viewModel.pop()
         assertTrue(state.stack.isEmpty())
@@ -44,20 +46,21 @@ class NavigationViewModelTest {
 
     @Test
     fun `reselecting the active tab returns to its root and other tabs keep their stacks`() {
-        viewModel.push(Destination.Settings)
+        val program = Destination.Program(catalogItem("p"))
+        viewModel.push(program)
         viewModel.selectTab(Tab.EXPLORE)
         viewModel.push(Destination.Portada("https://www.rtve.es/play/x.json", "X"))
         viewModel.selectTab(Tab.EXPLORE)
         assertTrue(state.stack.isEmpty())
 
         viewModel.selectTab(Tab.HOME)
-        assertEquals(listOf(Destination.Settings), state.stack)
+        assertEquals(listOf(program), state.stack)
     }
 
     @Test
     fun `entry keys are stable per position and the visible one follows the stack`() {
         assertEquals("HOME/root", state.currentKey)
-        viewModel.push(Destination.Settings)
+        viewModel.push(Destination.Program(catalogItem("p")))
         viewModel.push(Destination.Video(catalogItem("v")))
         assertEquals("HOME/1", state.currentKey)
         assertEquals(setOf("HOME/root", "HOME/0", "HOME/1", "SEARCH/root", "EXPLORE/root"), state.liveKeys)
@@ -67,7 +70,7 @@ class NavigationViewModelTest {
 
     @Test
     fun `leaving an entry clears its ViewModelStore and the root stores survive`() {
-        viewModel.push(Destination.Settings)
+        viewModel.push(Destination.Program(catalogItem("p")))
         val entryStore = viewModel.storeOwner(state.currentKey).viewModelStore
         val rootStore = viewModel.storeOwner("HOME/root").viewModelStore
         val entryModel = TrackedViewModel().also { entryStore.put("m", it) }
@@ -78,12 +81,64 @@ class NavigationViewModelTest {
         assertFalse(rootModel.cleared)
         assertTrue("una entrada nueva en la misma posición empieza de cero", viewModel.storeOwner("HOME/0").viewModelStore !== entryStore)
 
-        viewModel.push(Destination.Settings)
-        viewModel.push(Destination.Settings)
+        viewModel.push(Destination.Program(catalogItem("p2")))
+        viewModel.push(Destination.Video(catalogItem("v2")))
         val nested = TrackedViewModel().also { viewModel.storeOwner("HOME/1").viewModelStore.put("m", it) }
         viewModel.selectTab(Tab.HOME)
         assertTrue("volver a la raíz libera toda la pila", nested.cleared)
         assertFalse(rootModel.cleared)
+    }
+
+    @Test
+    fun `settings is global and never becomes part of a tab stack`() {
+        val category = Destination.Portada("https://www.rtve.es/play/cine/index_apps.json", "Cine")
+        viewModel.selectTab(Tab.EXPLORE)
+        viewModel.push(category)
+        viewModel.openGlobal(GlobalDestination.Settings)
+
+        assertEquals(GlobalDestination.Settings, state.current)
+        assertEquals(GlobalDestination.Settings, state.global)
+        assertEquals(listOf(category), state.stack)
+        assertEquals("global/settings", state.currentKey)
+
+        // Elegir Inicio cierra Ajustes; Explorar conserva su propia pila sin Ajustes.
+        viewModel.selectTab(Tab.HOME)
+        assertNull(state.global)
+        assertNull(state.current)
+        viewModel.selectTab(Tab.EXPLORE)
+        assertEquals(category, state.current)
+    }
+
+    @Test
+    fun `back from global settings reveals the exact underlying destination`() {
+        val video = Destination.Video(catalogItem("v"))
+        viewModel.push(video)
+        viewModel.openGlobal(GlobalDestination.Settings)
+        val settingsStore = viewModel.storeOwner(state.currentKey).viewModelStore
+        val settingsModel = TrackedViewModel().also { settingsStore.put("m", it) }
+
+        viewModel.pop()
+
+        assertEquals(video, state.current)
+        assertNull(state.global)
+        assertTrue("el estado global se libera al cerrarlo", settingsModel.cleared)
+    }
+
+    @Test
+    fun `deep link builds a synthetic home stack and clears previous destinations`() {
+        viewModel.selectTab(Tab.EXPLORE)
+        viewModel.push(Destination.Portada("https://www.rtve.es/play/cine/index_apps.json", "Cine"))
+        viewModel.openGlobal(GlobalDestination.Settings)
+        val video = Destination.Video(catalogItem("deep"))
+
+        viewModel.openDeepLink(video)
+
+        assertEquals(Tab.HOME, state.tab)
+        assertEquals(listOf(video), state.stack)
+        assertNull(state.global)
+        assertEquals(video, state.current)
+        viewModel.pop()
+        assertNull("atrás vuelve al inicio fijo", state.current)
     }
 
     private class TrackedViewModel : androidx.lifecycle.ViewModel() {
