@@ -1,0 +1,51 @@
+package es.openrtve.ui
+
+import es.openrtve.domain.CatalogItem
+import es.openrtve.domain.referenceItem
+import es.openrtve.domain.ContentKind
+import es.openrtve.domain.VideoDetail
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** Qué enseña el cuerpo de la ficha y qué pestañas lleva: decisiones puras, sin Compose. */
+class ProgramBodyTest {
+    private fun item(id: String) = referenceItem(id, ContentKind.VIDEO, "Vídeo $id")
+
+    private fun state(episodes: List<CatalogItem> = emptyList(), isLoading: Boolean = false, error: LoadError? = null) =
+        ProgramUiState(programId = "p1", title = "Programa", episodes = episodes, isLoading = isLoading, error = error)
+
+    @Test
+    fun `mientras no se saben los capitulos el cuerpo carga, con la cabecera ya pintada`() {
+        assertEquals(ProgramBody.Loading, programBody(state(isLoading = true)))
+    }
+
+    @Test
+    fun `con capitulos se enseña la lista`() {
+        assertEquals(ProgramBody.Episodes, programBody(state(episodes = listOf(item("v1")))))
+    }
+
+    @Test
+    fun `sin capitulos se explica el hueco, con el error si lo hubo`() {
+        assertEquals(ProgramBody.NoEpisodes(null), programBody(state()))
+        assertEquals(ProgramBody.NoEpisodes(LoadError.Offline), programBody(state(error = LoadError.Offline)))
+    }
+
+    @Test
+    fun `la ficha de programa solo tiene capitulos, asi que no enseña fila de pestañas`() {
+        assertEquals(listOf(ProgramTab.EPISODES), programTabs(ProgramBody.Episodes))
+    }
+
+    @Test
+    fun `la ficha de video enseña detalles solo si hay ficha tecnica`() {
+        val video = item("v1")
+        fun detail(director: String?) = VideoDetail(
+            item = video, backdropUrl = null, description = "Sinopsis", promo = null, subtypeName = null,
+            programTitle = null, year = null, ageRating = null, genres = emptyList(), director = director,
+            cast = emptyList(), originalLanguage = null, expirationDate = null, webUrl = null,
+        )
+        // La sinopsis va en la cabecera: sola no justifica la pestaña.
+        assertTrue(videoTabs(VideoUiState(item = video, detail = detail(null))).isEmpty())
+        assertEquals(listOf(ProgramTab.DETAILS), videoTabs(VideoUiState(item = video, detail = detail("Alguien"))))
+    }
+}

@@ -2,6 +2,10 @@ package es.openrtve.ui.mobile
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -76,6 +80,10 @@ fun MobileApp(
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 snackbarHost = { SnackbarHost(snackbarHostState) },
+                // Sin el inset superior: cada pantalla lo gestiona (la barra de
+                // aplicación lo lleva dentro; la portada raíz y las fichas van a
+                // sangre bajo la barra de estado).
+                contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
             ) { padding ->
                 Box(
                     Modifier
@@ -109,6 +117,7 @@ fun MobileApp(
                                 onBack = navigation::pop,
                                 onOpenItem = actions.playItem,
                                 onError = actions.showMessage,
+                                onPlay = actions::play,
                             )
                             GlobalDestination.Settings -> SettingsScreen(
                                 container = container,

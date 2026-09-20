@@ -68,6 +68,9 @@
     <string name="program_play_episode">Reproducir · %1$s</string>
     <string name="episode_watched">Visto</string>
     <string name="episode_next">Siguiente</string>
+    <string name="tab_episodes">Episodios</string>
+    <string name="tab_more_videos">Más vídeos</string>
+    <string name="tab_details">Detalles</string>
 
     <string name="action_play">Reproducir</string>
     <string name="action_open_program">Programa</string>
