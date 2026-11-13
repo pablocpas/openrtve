@@ -26,7 +26,11 @@ import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.unit.dp
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
+import es.openrtve.data.Favorites
 import es.openrtve.data.WatchHistory
+import es.openrtve.ui.FavoriteToggle
+import es.openrtve.ui.favoriteItem
+import es.openrtve.ui.rememberFavoriteToggle
 import es.openrtve.domain.CatalogItem
 import es.openrtve.ui.LoadMoreOnScrollEnd
 import es.openrtve.ui.PlaySuggestion
@@ -59,10 +63,12 @@ fun ProgramScreen(
     onPlay: ((CatalogItem, restart: Boolean) -> Unit)? = null,
     /** Abrir la ficha de un similar o una pieza de una colección. */
     onOpenRelated: (CatalogItem) -> Unit = onOpenItem,
+    favorites: Favorites? = null,
 ) {
     val screen = rememberProgramScreen(repository, history, program)
     val viewModel = screen.viewModel
     val state = screen.state
+    val favorite = favorites?.let { rememberFavoriteToggle(it, state.favoriteItem(program)) }
     val suggestion = screen.suggestion
     val context = LocalContext.current
     val detail = state.detail
@@ -96,14 +102,21 @@ fun ProgramScreen(
                 // En un contenedor (un ciclo de cine) reparto y dirección no son de ninguna obra.
                 facts = detail?.facts?.takeUnless { state.structure.isCollection },
                 progress = (suggestion as? PlaySuggestion.Continue)?.entry?.progress,
-                actions = suggestion?.let { target ->
-                    {
-                        PrimaryPlayButton(
-                            suggestion = target,
-                            onPlay = { item, restart -> if (onPlay != null) onPlay(item, restart) else onOpenItem(item) },
-                            canRestart = onPlay != null,
-                        )
+                actions = when {
+                    suggestion != null -> {
+                        {
+                            PrimaryPlayButton(
+                                suggestion = suggestion,
+                                onPlay = { item, restart -> if (onPlay != null) onPlay(item, restart) else onOpenItem(item) },
+                                canRestart = onPlay != null,
+                                favorite = favorite,
+                            )
+                        }
                     }
+                    favorite != null -> {
+                        { FavoriteButton(favorite) }
+                    }
+                    else -> null
                 },
             )
         },
@@ -147,6 +160,7 @@ internal fun PrimaryPlayButton(
     suggestion: PlaySuggestion,
     onPlay: (CatalogItem, restart: Boolean) -> Unit,
     canRestart: Boolean = true,
+    favorite: FavoriteToggle? = null,
 ) {
     val label = suggestion.label(LocalContext.current)
     val restart = stringResource(R.string.action_restart)
@@ -156,6 +170,7 @@ internal fun PrimaryPlayButton(
         secondary = listOfNotNull(
             SecondaryAction(Icons.Filled.Refresh, restart) { onPlay(suggestion.item, true) }
                 .takeIf { canRestart && suggestion is PlaySuggestion.Continue },
+            favorite?.asSecondaryAction(),
         ),
     )
 }

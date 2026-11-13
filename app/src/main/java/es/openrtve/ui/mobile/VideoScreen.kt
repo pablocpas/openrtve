@@ -11,7 +11,10 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.fromHtml
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
+import es.openrtve.data.Favorites
 import es.openrtve.data.WatchHistory
+import es.openrtve.ui.favoriteItem
+import es.openrtve.ui.rememberFavoriteToggle
 import es.openrtve.domain.CatalogItem
 import es.openrtve.ui.collectionLinkText
 import es.openrtve.ui.LoadMoreOnScrollEnd
@@ -41,9 +44,11 @@ fun VideoScreen(
     onPlay: (CatalogItem, Boolean) -> Unit,
     onOpenItem: (CatalogItem) -> Unit,
     onOpenProgram: (programId: String, title: String) -> Unit,
+    favorites: Favorites? = null,
 ) {
     val screen = rememberVideoScreen(repository, history, item)
     val state = screen.state
+    val favorite = favorites?.let { rememberFavoriteToggle(it, state.favoriteItem()) }
     val resume = screen.resume
     val context = LocalContext.current
     val detail = state.detail
@@ -86,6 +91,7 @@ fun VideoScreen(
                         onPlay = { onPlay(state.item, false) },
                         secondary = listOfNotNull(
                             SecondaryAction(Icons.Filled.Refresh, restart) { onPlay(state.item, true) }.takeIf { resume != null },
+                            favorite?.asSecondaryAction(),
                         ),
                     )
                 },

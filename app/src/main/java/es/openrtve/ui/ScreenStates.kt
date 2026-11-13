@@ -24,8 +24,10 @@ import es.openrtve.AppContainer
 import es.openrtve.data.CatalogRepository
 import es.openrtve.data.Settings
 import es.openrtve.data.WatchEntry
+import es.openrtve.data.Favorites
 import es.openrtve.data.WatchHistory
 import es.openrtve.domain.CatalogItem
+import es.openrtve.domain.ContentKind
 import es.openrtve.domain.HomeRow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -91,6 +93,18 @@ fun rememberPortadaScreen(
     }
     // Sin ErrorEffect: el fallo de la portada se pinta en su sitio (ver PortadaUiState.error).
     return PortadaScreenState(viewModel, state, resumable)
+}
+
+/** Si una ficha está en "Mi lista" y cómo cambiarlo; `null` si no se puede guardar (un directo). */
+class FavoriteToggle(val isFavorite: Boolean, val toggle: () -> Unit)
+
+/** [item] es lo que se guarda: lo que la ficha ya sabe de él, para pintar su tarjeta después. */
+@Composable
+fun rememberFavoriteToggle(favorites: Favorites, item: CatalogItem): FavoriteToggle? {
+    val items by favorites.items.collectAsStateWithLifecycle()
+    if (!favorites.canAdd(item)) return null
+    val isFavorite = remember(items, item.id) { items.any { it.id == item.id } }
+    return FavoriteToggle(isFavorite) { favorites.toggle(item) }
 }
 
 class ModuleScreenState(val viewModel: ModuleViewModel, val state: ModuleUiState)
@@ -246,3 +260,16 @@ fun rememberSettingsScreen(container: AppContainer): SettingsScreenState {
 }
 
 private const val LIVE_REFRESH_MS = 60_000L
+
+/** Lo que guarda "Mi lista" desde la ficha de programa: si se llegó por un enlace, el título y la imagen salen de la ficha. */
+fun ProgramUiState.favoriteItem(program: CatalogItem): CatalogItem = program.copy(
+    title = title.ifBlank { program.title },
+    imageUrl = program.imageUrl ?: detail?.imageUrl,
+    kind = ContentKind.PROGRAM,
+)
+
+/** Lo que guarda "Mi lista" desde la ficha de vídeo. */
+fun VideoUiState.favoriteItem(): CatalogItem = item.copy(
+    imageUrl = item.imageUrl ?: detail?.backdropUrl,
+    subtitle = item.subtitle ?: detail?.programTitle,
+)

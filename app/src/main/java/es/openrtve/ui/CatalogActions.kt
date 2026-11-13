@@ -50,6 +50,13 @@ class CatalogActions(
 
     fun undoRemoveFromHistory(message: UiMessage.RemovedFromHistory) = container.watchHistory.restore(message.entry)
 
+    /** Quita un título de "Mi lista" y ofrece deshacerlo. */
+    val removeFromMyList: (CatalogItem) -> Unit = { item ->
+        container.favorites.remove(item.id)?.let { navigation.show(UiMessage.RemovedFromMyList(it)) }
+    }
+
+    fun undoRemoveFromMyList(message: UiMessage.RemovedFromMyList) = container.favorites.restore(message.entry)
+
     /** Programas y vídeos abren su ficha; los directos se reproducen al momento. */
     val openItem: (CatalogItem) -> Unit = { item ->
         when (item.kind) {

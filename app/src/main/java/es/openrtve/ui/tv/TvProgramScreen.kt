@@ -1,11 +1,13 @@
 package es.openrtve.ui.tv
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +22,10 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
+import es.openrtve.data.Favorites
 import es.openrtve.data.WatchHistory
+import es.openrtve.ui.favoriteItem
+import es.openrtve.ui.rememberFavoriteToggle
 import es.openrtve.domain.CatalogItem
 import es.openrtve.ui.ProgramUiState
 import es.openrtve.ui.ProgramViewModel
@@ -48,10 +53,12 @@ fun TvProgramScreen(
     onOpenItem: (CatalogItem) -> Unit,
     /** Los similares y las piezas de una colección abren su ficha. */
     onOpenRelated: (CatalogItem) -> Unit = onOpenItem,
+    favorites: Favorites? = null,
 ) {
     val screen = rememberProgramScreen(repository, history, program)
     val viewModel = screen.viewModel
     val state = screen.state
+    val favorite = favorites?.let { rememberFavoriteToggle(it, state.favoriteItem(program)) }
     val suggestion = screen.suggestion
     val structure = state.structure
     val sections = state.contentSections
@@ -70,19 +77,25 @@ fun TvProgramScreen(
                 Text(error.text(LocalContext.current))
                 Button(onClick = viewModel::retry) { Text(stringResource(R.string.action_retry)) }
             }
-            if (!structure.isCollection) {
+            if (!structure.isCollection || favorite != null) {
                 Spacer(Modifier.height(20.dp))
-                Button(
-                    onClick = { suggestion?.let { onOpenItem(it.item) } },
-                    enabled = suggestion != null,
-                    // Deshabilitado no admite el foco: se concede en cuanto hay qué reproducir.
-                    modifier = Modifier.initialFocus(enabled = suggestion != null),
-                ) {
-                    Text(
-                        text = suggestion?.label(LocalContext.current) ?: stringResource(R.string.action_play),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (!structure.isCollection) {
+                        Button(
+                            onClick = { suggestion?.let { onOpenItem(it.item) } },
+                            enabled = suggestion != null,
+                            // Deshabilitado no admite el foco: se concede en cuanto hay qué reproducir.
+                            modifier = Modifier.initialFocus(enabled = suggestion != null),
+                        ) {
+                            Text(
+                                text = suggestion?.label(LocalContext.current) ?: stringResource(R.string.action_play),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    // En un contenedor el foco sigue empezando en su catálogo: "Mi lista" queda arriba.
+                    favorite?.let { TvFavoriteButton(it) }
                 }
             }
         },

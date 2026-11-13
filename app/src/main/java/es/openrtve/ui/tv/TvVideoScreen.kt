@@ -15,7 +15,10 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import es.openrtve.R
 import es.openrtve.data.CatalogRepository
+import es.openrtve.data.Favorites
 import es.openrtve.data.WatchHistory
+import es.openrtve.ui.favoriteItem
+import es.openrtve.ui.rememberFavoriteToggle
 import es.openrtve.domain.CatalogItem
 import es.openrtve.ui.collectionLinkText
 import es.openrtve.ui.facts
@@ -40,9 +43,11 @@ fun TvVideoScreen(
     onOpenProgram: (programId: String, title: String) -> Unit,
     /** Un similar abre su ficha; capítulos y extras se reproducen con [onPlay]. */
     onOpenItem: (CatalogItem) -> Unit,
+    favorites: Favorites? = null,
 ) {
     val screen = rememberVideoScreen(repository, history, item)
     val state = screen.state
+    val favorite = favorites?.let { rememberFavoriteToggle(it, state.favoriteItem()) }
     val resume = screen.resume
     val context = LocalContext.current
     val detail = state.detail
@@ -71,6 +76,7 @@ fun TvVideoScreen(
                 if (resume != null) {
                     Button(onClick = { onPlay(state.item, true) }) { Text(stringResource(R.string.action_restart)) }
                 }
+                favorite?.let { TvFavoriteButton(it) }
                 if (detail == null && state.error != null) {
                     Button(onClick = viewModel::retry) { Text(stringResource(R.string.action_retry)) }
                 }

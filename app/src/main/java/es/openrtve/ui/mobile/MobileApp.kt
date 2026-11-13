@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -64,7 +65,7 @@ fun MobileApp(
     nav.message?.let { message ->
         val text = message.text(context)
         LaunchedEffect(message) {
-            val undo = undoLabel.takeIf { message is UiMessage.RemovedFromHistory }
+            val undo = undoLabel.takeIf { message is UiMessage.RemovedFromHistory || message is UiMessage.RemovedFromMyList }
             // "Abriendo enlace…" se queda hasta que el enlace se resuelve; con acción
             // ("Deshacer") el aviso dura más: cuatro segundos no dan para pulsarla.
             val duration = when {
@@ -73,7 +74,11 @@ fun MobileApp(
                 else -> SnackbarDuration.Short
             }
             val result = snackbarHostState.showSnackbar(text, actionLabel = undo, duration = duration)
-            if (result == SnackbarResult.ActionPerformed && message is UiMessage.RemovedFromHistory) actions.undoRemoveFromHistory(message)
+            if (result == SnackbarResult.ActionPerformed) when (message) {
+                is UiMessage.RemovedFromHistory -> actions.undoRemoveFromHistory(message)
+                is UiMessage.RemovedFromMyList -> actions.undoRemoveFromMyList(message)
+                else -> Unit
+            }
             navigation.dismissMessage(message)
         }
     }
@@ -127,6 +132,7 @@ fun MobileApp(
                                 onOpenItem = actions.playItem,
                                 onPlay = actions::play,
                                 onOpenRelated = actions.openItem,
+                                favorites = container.favorites,
                             )
                             GlobalDestination.Settings -> SettingsScreen(
                                 container = container,
@@ -141,6 +147,7 @@ fun MobileApp(
                                 onPlay = actions::play,
                                 onOpenItem = actions.openItem,
                                 onOpenProgram = actions.openProgram,
+                                favorites = container.favorites,
                             )
                             null -> when (nav.tab) {
                                 Tab.HOME -> PortadaScreen(
@@ -154,6 +161,7 @@ fun MobileApp(
                                     onOpenLink = actions.openLink,
                                     onOpenSettings = actions.openSettings,
                                     onResume = actions.playItem,
+                                    onRestart = { actions.play(it, restart = true) },
                                     onRemoveFromHistory = actions.removeFromHistory,
                                     reselectRequest = nav.rootRequests.getValue(Tab.HOME),
                                 )
@@ -168,6 +176,12 @@ fun MobileApp(
                                     onOpenItem = actions.openItem,
                                     onOpenSettings = actions.openSettings,
                                     reselectRequest = nav.rootRequests.getValue(Tab.EXPLORE),
+                                )
+                                Tab.MY_LIST -> MyListScreen(
+                                    favorites = container.favorites,
+                                    onOpenItem = actions.openItem,
+                                    onRemove = actions.removeFromMyList,
+                                    reselectRequest = nav.rootRequests.getValue(Tab.MY_LIST),
                                 )
                             }
                         }
@@ -196,5 +210,11 @@ private fun NavigationSuiteScope.appNavigationItems(selected: Tab, onSelect: (Ta
         onClick = { onSelect(Tab.EXPLORE) },
         icon = { Icon(Icons.Filled.Menu, contentDescription = null) },
         label = { Text(stringResource(R.string.tab_explore)) },
+    )
+    item(
+        selected = selected == Tab.MY_LIST,
+        onClick = { onSelect(Tab.MY_LIST) },
+        icon = { Icon(Icons.Filled.Star, contentDescription = null) },
+        label = { Text(stringResource(R.string.favorites_title)) },
     )
 }

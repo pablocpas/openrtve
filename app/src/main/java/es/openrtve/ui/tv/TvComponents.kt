@@ -35,6 +35,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
@@ -54,11 +59,16 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.FilterChip
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Glow
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import es.openrtve.R
+import es.openrtve.ui.FavoriteToggle
 import es.openrtve.domain.CatalogItem
 import es.openrtve.domain.LiveInfo
 import es.openrtve.domain.RowLayout
@@ -118,6 +128,25 @@ internal suspend fun requestFocusUntilGranted(requester: FocusRequester, granted
 
 private const val FOCUS_ATTEMPTS = 20
 private const val FOCUS_RETRY_MS = 60L
+
+/**
+ * Para lo que se abre con una pulsación larga de OK (los menús contextuales).
+ * Al aparecer, el botón del mando sigue pulsado: llegan más repeticiones y, al
+ * soltarlo, un KEY_UP que tv-material convierte en clic del botón que acaba de
+ * recibir el foco. El menú se cerraba solo y elegía la primera opción.
+ * Hasta una pulsación nueva (KEY_DOWN sin repetición) se descartan los eventos de OK.
+ */
+@Composable
+internal fun Modifier.ignoreHeldSelectKey(): Modifier {
+    val armed = remember { booleanArrayOf(false) }
+    return onPreviewKeyEvent { event ->
+        if (event.key !in SelectKeys) return@onPreviewKeyEvent false
+        if (!armed[0] && event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) armed[0] = true
+        !armed[0]
+    }
+}
+
+private val SelectKeys = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
 
 /* Guía de diseño de TV: márgenes de overscan de 48 dp en horizontal y 27 dp en vertical. */
 internal val TvHorizontalMargin = 48.dp
@@ -265,12 +294,14 @@ internal fun TvItemCard(
     progress: Float? = null,
     /** Posición en un ranking ("Lo más visto"); se pinta grande sobre la imagen. */
     rank: Int? = null,
+    /** Sin él, el menú general de la tarjeta ("Mi lista", ficha); ver [itemMenuLongClick]. */
     onLongClick: (() -> Unit)? = null,
 ) {
     val live = item.live
+    val longClick = onLongClick ?: itemMenuLongClick(item)
     Column(modifier) {
         if (live == null) {
-            TvFocusSurface(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(layout.aspectRatio), onLongClick = onLongClick) {
+            TvFocusSurface(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(layout.aspectRatio), onLongClick = longClick) {
                 TvArtwork(item.imageFor(layout), Modifier.fillMaxSize())
                 rank?.let { TvRankBadge(it, Modifier.align(Alignment.BottomStart)) }
                 progress?.let { TvProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
@@ -461,5 +492,19 @@ internal fun TvCenterMessage(message: String, onRetry: (() -> Unit)? = null) {
             Button(onClick = onRetry, modifier = Modifier.initialFocus()) { Text(stringResource(R.string.action_retry)) }
         }
         Spacer(Modifier.weight(1f))
+    }
+}
+
+/** Botón de "Mi lista" de las fichas, como en el móvil: "+ Mi lista" o "✓ En Mi lista". */
+@Composable
+internal fun TvFavoriteButton(favorite: FavoriteToggle) {
+    Button(onClick = favorite.toggle) {
+        Icon(
+            if (favorite.isFavorite) Icons.Filled.Check else Icons.Filled.Add,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(if (favorite.isFavorite) R.string.favorites_in_list else R.string.favorites_title))
     }
 }

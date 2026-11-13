@@ -95,7 +95,7 @@ class NavigationViewModelTest {
         viewModel.push(Destination.Program(catalogItem("p")))
         viewModel.push(Destination.Video(catalogItem("v")))
         assertEquals("HOME/1", state.currentKey)
-        assertEquals(setOf("HOME/root", "HOME/0", "HOME/1", "SEARCH/root", "EXPLORE/root"), state.liveKeys)
+        assertEquals(setOf("HOME/root", "HOME/0", "HOME/1", "SEARCH/root", "EXPLORE/root", "MY_LIST/root"), state.liveKeys)
         viewModel.pop()
         assertEquals("HOME/0", state.currentKey)
     }

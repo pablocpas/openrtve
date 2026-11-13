@@ -31,6 +31,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import es.openrtve.data.Favorites
 import es.openrtve.data.NotCachedException
 import es.openrtve.domain.CatalogModule
 import es.openrtve.domain.ExploreCategory
@@ -60,6 +61,9 @@ class RootActionsTest {
     private val navigation = NavigationViewModel(SavedStateHandle())
     private lateinit var focusManager: FocusManager
     private val keyboard = RecordingKeyboard()
+    private val favorites = Favorites(
+        java.io.File(androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "root-actions-favorites-${System.nanoTime()}.json"),
+    )
     private val repository = FakeCatalogRepository().apply {
         portada = { _, _, cachedOnly ->
             if (cachedOnly) throw NotCachedException()
@@ -149,6 +153,7 @@ class RootActionsTest {
                                     Tab.HOME -> PortadaScreen(repository, "https://www.rtve.es/play/index_apps.json", "", null, {}, { _, _ -> }, reselectRequest = nav.rootRequests.getValue(Tab.HOME))
                                     Tab.SEARCH -> SearchScreen(repository, {}, reselectRequest = nav.rootRequests.getValue(Tab.SEARCH))
                                     Tab.EXPLORE -> ExploreScreen(repository, {}, {}, {}, reselectRequest = nav.rootRequests.getValue(Tab.EXPLORE))
+                                    Tab.MY_LIST -> MyListScreen(favorites, {}, {}, reselectRequest = nav.rootRequests.getValue(Tab.MY_LIST))
                                 }
                             }
                         }

@@ -77,6 +77,7 @@ fun UiMessage.text(context: Context): String = when (this) {
     UiMessage.LinkNotFound -> context.getString(R.string.deeplink_not_found)
     UiMessage.OpeningLink -> context.getString(R.string.deeplink_opening)
     is UiMessage.RemovedFromHistory -> context.getString(R.string.continue_removed, entry.item.title)
+    is UiMessage.RemovedFromMyList -> context.getString(R.string.favorites_removed, entry.item.title)
 }
 
 /**

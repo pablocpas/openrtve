@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -83,7 +84,7 @@ fun TvApp(container: AppContainer, incomingLinks: Flow<String> = emptyFlow()) {
     }
 
     val destination = nav.current
-    ProvideClock {
+    ProvideClock { ProvideTvItemMenu(container.favorites, onOpenDetails = actions.openItem, onRemove = actions.removeFromMyList) {
         NavigationDrawer(
             drawerContent = {
                 // Al entrar en el menú desde el contenido, el foco va a la sección activa,
@@ -101,6 +102,7 @@ fun TvApp(container: AppContainer, incomingLinks: Flow<String> = emptyFlow()) {
                     DrawerEntry(Icons.Filled.Home, stringResource(R.string.tab_home), nav.global == null && nav.tab == Tab.HOME, selectedEntry) { navigation.selectTab(Tab.HOME) }
                     DrawerEntry(Icons.Filled.Search, stringResource(R.string.tab_search), nav.global == null && nav.tab == Tab.SEARCH, selectedEntry) { navigation.selectTab(Tab.SEARCH) }
                     DrawerEntry(Icons.Filled.Menu, stringResource(R.string.tab_explore), nav.global == null && nav.tab == Tab.EXPLORE, selectedEntry) { navigation.selectTab(Tab.EXPLORE) }
+                    DrawerEntry(Icons.Filled.Star, stringResource(R.string.favorites_title), nav.global == null && nav.tab == Tab.MY_LIST, selectedEntry) { navigation.selectTab(Tab.MY_LIST) }
                     DrawerEntry(Icons.Filled.Settings, stringResource(R.string.settings_title), destination == GlobalDestination.Settings, selectedEntry) {
                         if (destination != GlobalDestination.Settings) actions.openSettings()
                     }
@@ -134,6 +136,7 @@ fun TvApp(container: AppContainer, incomingLinks: Flow<String> = emptyFlow()) {
                             program = current.item,
                             onOpenItem = actions.playItem,
                             onOpenRelated = actions.openItem,
+                            favorites = container.favorites,
                         )
                         is Destination.Video -> TvVideoScreen(
                             repository = repository,
@@ -142,6 +145,7 @@ fun TvApp(container: AppContainer, incomingLinks: Flow<String> = emptyFlow()) {
                             onPlay = actions::play,
                             onOpenProgram = actions.openProgram,
                             onOpenItem = actions.openItem,
+                            favorites = container.favorites,
                         )
                         GlobalDestination.Settings -> TvSettingsScreen(container, onMessage = actions.showMessage)
                         null -> when (nav.tab) {
@@ -154,11 +158,13 @@ fun TvApp(container: AppContainer, incomingLinks: Flow<String> = emptyFlow()) {
                                 onOpenRow = actions.openRow,
                                 onOpenLink = actions.openLink,
                                 onResume = actions.playItem,
+                                onRestart = { actions.play(it, restart = true) },
                                 onRemoveFromHistory = actions.removeFromHistory,
                                 reselectRequest = nav.rootRequests.getValue(Tab.HOME),
                             )
                             Tab.SEARCH -> TvSearchScreen(repository, actions.openItem, reselectRequest = nav.rootRequests.getValue(Tab.SEARCH))
                             Tab.EXPLORE -> TvExploreScreen(repository, actions.openCategory, actions.openItem, reselectRequest = nav.rootRequests.getValue(Tab.EXPLORE))
+                            Tab.MY_LIST -> TvMyListScreen(container.favorites, actions.openItem)
                         }
                     } }
                 }
@@ -176,7 +182,7 @@ fun TvApp(container: AppContainer, incomingLinks: Flow<String> = emptyFlow()) {
                 }
             }
         }
-    }
+    } }
 }
 
 @Composable

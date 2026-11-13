@@ -52,6 +52,8 @@ internal fun TvItemGrid(
     onOpenItem: (CatalogItem) -> Unit,
     /** Sin foco inicial cuando la pantalla ya lo da a otra cosa (el campo del buscador). */
     takesInitialFocus: Boolean = true,
+    /** Para seguir el foco de cada tarjeta (ver [TvMyListScreen]). */
+    itemModifier: (index: Int, item: CatalogItem) -> Modifier = { _, _ -> Modifier },
 ) {
     // En rejilla el hero no tiene sentido: se degrada a apaisada.
     val gridLayout = layout.gridLayout
@@ -67,7 +69,7 @@ internal fun TvItemGrid(
                 item,
                 gridLayout,
                 { onOpenItem(item) },
-                if (index == 0 && takesInitialFocus) Modifier.initialFocus() else Modifier,
+                (if (index == 0 && takesInitialFocus) Modifier.initialFocus() else Modifier).then(itemModifier(index, item)),
                 rank = (index + 1).takeIf { gridLayout == RowLayout.RANKED },
             )
         }

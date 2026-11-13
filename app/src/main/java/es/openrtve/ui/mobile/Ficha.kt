@@ -31,9 +31,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import es.openrtve.R
 import es.openrtve.domain.CatalogItem
+import es.openrtve.ui.FavoriteToggle
 import es.openrtve.ui.FichaFacts
 import es.openrtve.ui.ProgramTab
 import es.openrtve.ui.titleRes
@@ -351,6 +355,24 @@ private fun FichaTitle(title: String, modifier: Modifier = Modifier) {
 
 /** Acción secundaria junto al botón de reproducir, como icono tonal. */
 internal data class SecondaryAction(val icon: ImageVector, val label: String, val onClick: () -> Unit)
+
+/** "+" para añadir a "Mi lista" y "✓" si ya está; el lector de pantalla dice qué hará. */
+@Composable
+internal fun FavoriteToggle.asSecondaryAction(): SecondaryAction = SecondaryAction(
+    icon = if (isFavorite) Icons.Filled.Check else Icons.Filled.Add,
+    label = stringResource(if (isFavorite) R.string.favorites_remove else R.string.favorites_add),
+    onClick = toggle,
+)
+
+/** Sin nada que reproducir (una colección), "Mi lista" va sola, con su rótulo. */
+@Composable
+internal fun FavoriteButton(favorite: FavoriteToggle) {
+    FilledTonalButton(onClick = favorite.toggle, modifier = Modifier.fillMaxWidth()) {
+        Icon(if (favorite.isFavorite) Icons.Filled.Check else Icons.Filled.Add, contentDescription = null)
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(if (favorite.isFavorite) R.string.favorites_in_list else R.string.favorites_title))
+    }
+}
 
 /**
  * Botón grande de reproducir, a todo el ancho, con las acciones secundarias

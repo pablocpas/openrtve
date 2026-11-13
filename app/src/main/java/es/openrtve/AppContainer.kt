@@ -5,6 +5,7 @@ import es.openrtve.data.AppSettings
 import es.openrtve.data.DeepLinkResolver
 import es.openrtve.data.DefaultCatalogRepository
 import es.openrtve.data.DrmTokenClient
+import es.openrtve.data.Favorites
 import es.openrtve.data.RawDocumentCache
 import es.openrtve.data.RtveJsonParser
 import es.openrtve.data.SafeHttpsClient
@@ -34,6 +35,7 @@ class AppContainer(context: Context) {
     val settings = AppSettings(context)
     val deepLinkResolver = DeepLinkResolver(catalogRepository)
     val watchHistory = WatchHistory(context.filesDir.resolve("watch-history.json"))
+    val favorites = Favorites(context.filesDir.resolve("favorites.json"))
     val playbackResolver = PlaybackResolver()
     val drmTokenClient = DrmTokenClient(httpClient)
 }

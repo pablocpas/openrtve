@@ -37,7 +37,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
@@ -73,8 +72,9 @@ fun TvPortadaScreen(
     onOpenRow: (HomeRow, String) -> Unit,
     history: WatchHistory? = null,
     onOpenLink: (HomeLink) -> Unit = {},
-    /** "Seguir viendo": continuar al pulsar; con pulsación larga, ficha o quitar. */
+    /** "Seguir viendo": continuar al pulsar; con pulsación larga, empezar de nuevo, ficha o quitar. */
     onResume: (CatalogItem) -> Unit = onOpenItem,
+    onRestart: (CatalogItem) -> Unit = onResume,
     onRemoveFromHistory: (CatalogItem) -> Unit = {},
     reselectRequest: Int = 0,
 ) {
@@ -140,9 +140,10 @@ fun TvPortadaScreen(
             val firstId = state.sections.first().row.id
             items(state.sections, key = { it.row.id }, contentType = { it.row.layout }) { section ->
                 if (resumable.isNotEmpty() && section.row.id == firstId && section.row.layout != RowLayout.HERO) {
-                    TvContinueWatching(resumable, onResume, onOpenItem, onRemoveFromHistory, rowModifier(CONTINUE_ROW_ID)) { itemModifier(CONTINUE_ROW_ID, it) }
+                    TvContinueWatching(resumable, onResume, onRestart, onOpenItem, onRemoveFromHistory, rowModifier(CONTINUE_ROW_ID)) { itemModifier(CONTINUE_ROW_ID, it) }
                     Spacer(Modifier.height(28.dp))
                 }
+
                 TvSection(
                     section = section,
                     // Como en Findroid: las filas se recolocan con animación si otra cambia de alto.
@@ -155,7 +156,7 @@ fun TvPortadaScreen(
                 )
                 if (resumable.isNotEmpty() && section.row.id == firstId && section.row.layout == RowLayout.HERO) {
                     Spacer(Modifier.height(28.dp))
-                    TvContinueWatching(resumable, onResume, onOpenItem, onRemoveFromHistory, rowModifier(CONTINUE_ROW_ID)) { itemModifier(CONTINUE_ROW_ID, it) }
+                    TvContinueWatching(resumable, onResume, onRestart, onOpenItem, onRemoveFromHistory, rowModifier(CONTINUE_ROW_ID)) { itemModifier(CONTINUE_ROW_ID, it) }
                 }
             }
         } }
@@ -166,6 +167,7 @@ fun TvPortadaScreen(
 private fun TvContinueWatching(
     entries: List<WatchEntry>,
     onResume: (CatalogItem) -> Unit,
+    onRestart: (CatalogItem) -> Unit,
     onOpenDetails: (CatalogItem) -> Unit,
     onRemove: (CatalogItem) -> Unit,
     modifier: Modifier,
@@ -193,41 +195,25 @@ private fun TvContinueWatching(
         }
     }
     options?.let { item ->
-        TvContinueWatchingOptions(
+        // Con el menú general disponible, aquí también se puede guardar en "Mi lista".
+        val favorites = LocalTvItemMenu.current?.favorites
+        val listed = favorites?.isListed(item)
+        TvOptionsDialog(
             title = item.title,
-            onResume = { options = null; onResume(item) },
-            onOpenDetails = { options = null; onOpenDetails(item) },
-            onRemove = { options = null; onRemove(item) },
+            options = listOfNotNull(
+                TvOption(stringResource(R.string.action_continue)) { options = null; onResume(item) },
+                TvOption(stringResource(R.string.action_restart)) { options = null; onRestart(item) },
+                TvOption(stringResource(R.string.continue_open_details)) { options = null; onOpenDetails(item) },
+                favorites?.takeIf { it.canAdd(item) }?.let {
+                    TvOption(stringResource(if (listed == true) R.string.favorites_remove else R.string.favorites_add)) {
+                        options = null
+                        it.toggle(item)
+                    }
+                },
+                TvOption(stringResource(R.string.continue_remove)) { options = null; onRemove(item) },
+            ),
             onDismiss = { options = null },
         )
-    }
-}
-
-/** Menú contextual de una tarjeta de "Seguir viendo", como el de Google TV. */
-@Composable
-private fun TvContinueWatchingOptions(
-    title: String,
-    onResume: () -> Unit,
-    onOpenDetails: () -> Unit,
-    onRemove: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        // El diálogo es otra "pantalla": su primer botón recibe el foco al abrirse.
-        ProvideScreenInitialFocus {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .background(MaterialTheme.colorScheme.surface, TvCardShape)
-                    .padding(24.dp)
-                    .width(360.dp),
-            ) {
-                Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Button(onClick = onResume, modifier = Modifier.fillMaxWidth().initialFocus()) { Text(stringResource(R.string.action_continue)) }
-                Button(onClick = onOpenDetails, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.continue_open_details)) }
-                Button(onClick = onRemove, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.continue_remove)) }
-            }
-        }
     }
 }
 
@@ -313,7 +299,7 @@ private fun TvSection(
  */
 @Composable
 private fun TvFeaturedCard(item: CatalogItem, onOpen: () -> Unit, modifier: Modifier) {
-    TvFocusSurface(onClick = onOpen, modifier = modifier.fillMaxWidth()) {
+    TvFocusSurface(onClick = onOpen, modifier = modifier.fillMaxWidth(), onLongClick = itemMenuLongClick(item)) {
         Row(Modifier.fillMaxWidth()) {
             Box(Modifier.width(TvHeroWidth).aspectRatio(16f / 9f)) {
                 TvArtwork(item.imageUrl, Modifier.fillMaxSize())
@@ -363,7 +349,11 @@ private fun TvHeroRow(items: List<CatalogItem>, onOpenItem: (CatalogItem) -> Uni
         modifier = modifier.focusRestorer(),
     ) {
         items(items, key = { it.id }) { item ->
-            TvFocusSurface(onClick = { onOpenItem(item) }, modifier = Modifier.width(TvHeroWidth).aspectRatio(16f / 9f).then(itemModifier(item.id))) {
+            TvFocusSurface(
+                onClick = { onOpenItem(item) },
+                modifier = Modifier.width(TvHeroWidth).aspectRatio(16f / 9f).then(itemModifier(item.id)),
+                onLongClick = itemMenuLongClick(item),
+            ) {
                 TvArtwork(item.imageUrl, Modifier.fillMaxSize())
                 Box(
                     Modifier

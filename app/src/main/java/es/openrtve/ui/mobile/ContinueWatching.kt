@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -51,6 +52,7 @@ import es.openrtve.domain.CatalogItem
 internal fun ContinueWatchingRow(
     entries: List<WatchEntry>,
     onResume: (CatalogItem) -> Unit,
+    onRestart: (CatalogItem) -> Unit,
     onOpenDetails: (CatalogItem) -> Unit,
     onRemove: (CatalogItem) -> Unit,
     modifier: Modifier = Modifier,
@@ -70,6 +72,7 @@ internal fun ContinueWatchingRow(
                 ContinueWatchingCard(
                     entry = entry,
                     onResume = { onResume(entry.item) },
+                    onRestart = { onRestart(entry.item) },
                     onOpenDetails = { onOpenDetails(entry.item) },
                     onRemove = { onRemove(entry.item) },
                     modifier = Modifier.width(ContinueCardWidth).animateItem(),
@@ -83,6 +86,7 @@ internal fun ContinueWatchingRow(
 private fun ContinueWatchingCard(
     entry: WatchEntry,
     onResume: () -> Unit,
+    onRestart: () -> Unit,
     onOpenDetails: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
@@ -123,13 +127,13 @@ private fun ContinueWatchingCard(
                     )
                 }
             }
-            ContinueWatchingMenu(onResume, onOpenDetails, onRemove)
+            ContinueWatchingMenu(onResume, onRestart, onOpenDetails, onRemove)
         }
     }
 }
 
 @Composable
-private fun ContinueWatchingMenu(onResume: () -> Unit, onOpenDetails: () -> Unit, onRemove: () -> Unit) {
+private fun ContinueWatchingMenu(onResume: () -> Unit, onRestart: () -> Unit, onOpenDetails: () -> Unit, onRemove: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     // El menú de Material 3 se ancla al botón que lo abre.
     Box {
@@ -141,6 +145,11 @@ private fun ContinueWatchingMenu(onResume: () -> Unit, onOpenDetails: () -> Unit
                 text = { Text(stringResource(R.string.action_continue)) },
                 leadingIcon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
                 onClick = { expanded = false; onResume() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_restart)) },
+                leadingIcon = { Icon(Icons.Filled.Refresh, contentDescription = null) },
+                onClick = { expanded = false; onRestart() },
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.continue_open_details)) },

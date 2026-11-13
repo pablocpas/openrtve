@@ -129,6 +129,13 @@
     <string name="continue_remove">Quitar de Seguir viendo</string>
     <string name="continue_removed">«%1$s» quitado de Seguir viendo</string>
     <string name="action_undo">Deshacer</string>
+    <string name="favorites_title">Mi lista</string>
+    <string name="favorites_add">Añadir a Mi lista</string>
+    <string name="favorites_remove">Quitar de Mi lista</string>
+    <string name="favorites_in_list">En Mi lista</string>
+    <string name="favorites_removed">«%1$s» quitado de Mi lista</string>
+    <string name="favorites_empty">Aún no has guardado nada. Añade programas y películas con «+» desde su ficha.</string>
+    <string name="favorites_empty_tv">Aún no has guardado nada. Añade programas y películas desde su ficha o manteniendo pulsado OK sobre una tarjeta.</string>
     <plurals name="continue_remaining_minutes">
         <item quantity="one">Queda %d min</item>
         <item quantity="other">Quedan %d min</item>

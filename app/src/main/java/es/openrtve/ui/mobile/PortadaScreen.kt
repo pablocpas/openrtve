@@ -84,8 +84,9 @@ fun PortadaScreen(
     onOpenSettings: (() -> Unit)? = null,
     history: WatchHistory? = null,
     onOpenLink: (HomeLink) -> Unit = {},
-    /** "Seguir viendo": continuar al tocar y quitar desde el menú de la tarjeta. */
+    /** "Seguir viendo": continuar al tocar; empezar de nuevo, ficha o quitar desde el menú de la tarjeta. */
     onResume: (CatalogItem) -> Unit = onOpenItem,
+    onRestart: (CatalogItem) -> Unit = onResume,
     onRemoveFromHistory: (CatalogItem) -> Unit = {},
     reselectRequest: Int = 0,
 ) {
@@ -133,7 +134,7 @@ fun PortadaScreen(
                     }
                     val heroFirst = startsWithHero && state.sections.first().state !is SectionState.Failed
                     if (resumable.isNotEmpty() && !heroFirst) {
-                        item(key = "continue") { ContinueWatchingRow(resumable, onResume, onOpenItem, onRemoveFromHistory, Modifier.animateItem()) }
+                        item(key = "continue") { ContinueWatchingRow(resumable, onResume, onRestart, onOpenItem, onRemoveFromHistory, Modifier.animateItem()) }
                     }
                     items(state.sections, key = { it.row.id }, contentType = { it.row.layout }) { section ->
                         SectionView(
@@ -149,7 +150,7 @@ fun PortadaScreen(
                         // Tras el hero, como en la app oficial y en Findroid.
                         if (heroFirst && resumable.isNotEmpty() && section.row.id == state.sections.first().row.id) {
                             Spacer(Modifier.height(22.dp))
-                            ContinueWatchingRow(resumable, onResume, onOpenItem, onRemoveFromHistory)
+                            ContinueWatchingRow(resumable, onResume, onRestart, onOpenItem, onRemoveFromHistory)
                         }
                     }
                 }

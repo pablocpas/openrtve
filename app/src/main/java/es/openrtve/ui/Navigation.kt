@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
+import es.openrtve.data.FavoriteEntry
 import es.openrtve.data.WatchEntry
 import es.openrtve.domain.BlockReason
 import es.openrtve.domain.CatalogItem
@@ -19,7 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class Tab { HOME, SEARCH, EXPLORE }
+enum class Tab { HOME, SEARCH, EXPLORE, MY_LIST }
 
 /** Cualquier pantalla que puede ocupar el host principal. */
 sealed interface AppDestination
@@ -62,6 +63,7 @@ sealed interface UiMessage {
     data object LinkNotFound : UiMessage
     /** Se quitó un item de "Seguir viendo"; el aviso ofrece deshacerlo. */
     data class RemovedFromHistory(val entry: WatchEntry) : UiMessage
+    data class RemovedFromMyList(val entry: FavoriteEntry) : UiMessage
     /** Un enlace recibido se está resolviendo (puede llevar una búsqueda): dura hasta que acaba. */
     data object OpeningLink : UiMessage
 }

@@ -287,7 +287,7 @@ private fun TvEpisodeCard(
 ) {
     val context = LocalContext.current
     Column(modifier) {
-        TvFocusSurface(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
+        TvFocusSurface(onClick = onClick, modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f), onLongClick = itemMenuLongClick(item)) {
             TvArtwork(item.imageUrl, Modifier.fillMaxSize())
             progress?.let { TvProgressStrip(it, Modifier.align(Alignment.BottomCenter)) }
         }
