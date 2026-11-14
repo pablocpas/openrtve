@@ -764,7 +764,7 @@
     ontimeupdate={onTimeUpdate}
     ondurationchange={() => (duration = Number.isFinite(video?.duration) ? video!.duration : 0)}
     onratechange={() => tracksVersion++}
-    ondblclick={(e) => (e.target as Element) === video && toggleFullscreen()}
+    ondblclick={(e) => lastPointerType === 'mouse' && (e.target as Element) === video && toggleFullscreen()}
     onclick={onSurfaceClick}
   ></video>
   <div class="text-layer" bind:this={textContainer}></div>
@@ -940,6 +940,8 @@
     outline: none;
     user-select: none;
     -webkit-user-select: none;
+    /* El doble toque salta 10 s: que el navegador no lo use para ampliar. */
+    touch-action: manipulation;
   }
 
   .player.hide-cursor {

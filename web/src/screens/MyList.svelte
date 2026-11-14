@@ -38,12 +38,12 @@
     }
   });
 
+  // Con el menú abierto, cualquier scroll lo cierra: va fijo en la ventana y se quedaría flotando.
   $effect(() => {
-    if (!scroller) return;
-    const el = scroller;
+    if (!menu) return;
     const close = () => (menu = null);
-    el.addEventListener('scroll', close, { passive: true });
-    return () => el.removeEventListener('scroll', close);
+    document.addEventListener('scroll', close, { capture: true, passive: true });
+    return () => document.removeEventListener('scroll', close, { capture: true });
   });
 </script>
 

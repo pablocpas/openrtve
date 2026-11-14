@@ -167,8 +167,11 @@
     font-size: 0.88rem;
   }
 
+  /* Pocas opciones: se reparten en líneas en vez de quedar cortadas por el borde. */
   .chips.flush {
     padding: 4px 0 0;
+    flex-wrap: wrap;
+    overflow: visible;
   }
 
   hr {

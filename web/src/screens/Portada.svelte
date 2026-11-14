@@ -311,7 +311,6 @@
       <section
         class="section"
         class:hero-section={layout === 'HERO'}
-        class:deferred={index > 1}
         use:nearViewport={{ root: scroller, key: section.row.contentUrl, onnear: () => activate(section.row) }}
       >
         {#if layout !== 'HERO' && section.title.trim()}
@@ -382,12 +381,6 @@
     padding-top: 64px;
   }
 
-  /* Las filas de abajo no se maquetan ni se pintan hasta acercarse. */
-  .section.deferred {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 260px;
-  }
-
   .section-head {
     padding: 0 var(--gutter) 10px;
     display: flex;
@@ -395,6 +388,7 @@
   }
 
   .head-link {
+    min-height: 40px;
     display: inline-flex;
     align-items: center;
     gap: 2px;

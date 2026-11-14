@@ -43,6 +43,15 @@
     return minutes === 1 ? 'Queda 1 min' : `Quedan ${minutes} min`;
   }
 
+  // Con el menú abierto, cualquier scroll (el de la pantalla con el dedo o el de la fila) lo cierra:
+  // va fijo en la ventana y se quedaría flotando separado de su tarjeta.
+  $effect(() => {
+    if (!menu) return;
+    const close = () => (menu = null);
+    document.addEventListener('scroll', close, { capture: true, passive: true });
+    return () => document.removeEventListener('scroll', close, { capture: true });
+  });
+
   function closeMenus(event: MouseEvent) {
     if (!(event.target as Element).closest('.menu-anchor')) menu = null;
   }

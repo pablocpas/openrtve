@@ -43,6 +43,8 @@
 
 html,
 body {
+  /* Sin zoom por doble toque (el reproductor lo usa para saltar); ampliar con dos dedos sigue funcionando. */
+  touch-action: manipulation;
   margin: 0;
   height: 100%;
   background: var(--bg);

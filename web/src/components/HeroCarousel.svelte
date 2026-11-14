@@ -14,7 +14,11 @@
 
   let track = $state<HTMLDivElement>();
   let current = $state(0);
-  let paused = $state(false);
+  // Se para con el ratón encima, con el foco dentro o mientras se toca.
+  let hovered = $state(false);
+  let focused = $state(false);
+  let touching = $state(false);
+  const paused = $derived(hovered || focused || touching);
   let viewportWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 1280);
 
   function go(index: number, smooth = true) {
@@ -28,7 +32,9 @@
     current = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
   }
 
+  // El contador vuelve a empezar con cada pieza: tras pasar una con el dedo no salta sola al segundo.
   $effect(() => {
+    void current;
     if (items.length < 2 || paused) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const timer = setInterval(() => {
@@ -56,10 +62,13 @@
   aria-label="Destacados"
   class:full={fullBleed}
   aria-roledescription="carrusel"
-  onmouseenter={() => (paused = true)}
-  onmouseleave={() => (paused = false)}
-  onfocusin={() => (paused = true)}
-  onfocusout={() => (paused = false)}
+  onmouseenter={() => (hovered = true)}
+  onmouseleave={() => (hovered = false)}
+  onfocusin={() => (focused = true)}
+  onfocusout={() => (focused = false)}
+  onpointerdown={(e) => e.pointerType !== 'mouse' && (touching = true)}
+  onpointerup={() => (touching = false)}
+  onpointercancel={() => (touching = false)}
 >
   <div class="track" bind:this={track} {onscroll} {onkeydown} role="presentation">
     {#each items as item, index (item.id)}
@@ -285,12 +294,23 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 6px;
-    height: 8px;
-    margin-top: 12px;
+    height: 32px;
   }
 
+  /* El punto se ve pequeño, pero se puede pulsar con el dedo: 20 x 32 px. */
   .dot {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 32px;
+  }
+
+  .dot.active {
+    width: 30px;
+  }
+
+  .dot::before {
+    content: '';
     width: 6px;
     height: 6px;
     border-radius: 50%;
@@ -298,7 +318,7 @@
     transition: background-color 0.2s, width 0.2s;
   }
 
-  .dot.active {
+  .dot.active::before {
     width: 18px;
     border-radius: 4px;
     background: var(--accent);

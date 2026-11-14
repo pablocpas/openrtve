@@ -229,7 +229,9 @@
     overflow: hidden;
   }
 
+  /* Todo el ancho disponible (sin él, una línea larga lo ensanchaba más allá de la pantalla del móvil). */
   .about {
+    width: 100%;
     margin-top: 16px;
     color: var(--muted);
     font-size: 0.95rem;
