@@ -11,6 +11,7 @@
     { tab: 'home', label: 'Inicio', icon: 'home' },
     { tab: 'search', label: 'Buscar', icon: 'search' },
     { tab: 'explore', label: 'Explorar', icon: 'menu' },
+    { tab: 'mylist', label: 'Mi lista', icon: 'star' },
   ];
 
   const settingsOpen = $derived(nav.background.route.name === 'settings');

@@ -4,7 +4,7 @@
   import Toast from './components/Toast.svelte';
   import { RtveUrls } from './lib/domain/models';
   import { openIncomingLink } from './lib/ui/actions';
-  import { isPlayerRoute, nav, routeToPath, screenKey, type Entry } from './lib/ui/nav.svelte';
+  import { isPlayerRoute, nav, routeToPath, screenKey, type Entry, type Route } from './lib/ui/nav.svelte';
   import { loadPlayerScreen } from './lib/ui/playerPreload';
   import Portada from './screens/Portada.svelte';
 
@@ -16,6 +16,7 @@
   const lazyScreens = {
     search: () => import('./screens/Search.svelte'),
     explore: () => import('./screens/Explore.svelte'),
+    mylist: () => import('./screens/MyList.svelte'),
     settings: () => import('./screens/Settings.svelte'),
     module: () => import('./screens/Module.svelte'),
     program: () => import('./screens/Program.svelte'),
@@ -69,16 +70,8 @@
   $effect(() => {
     const route = nav.background.route;
     if (playerEntry) return;
-    const title =
-      route.name === 'program' || route.name === 'video' || route.name === 'portada' || route.name === 'module'
-        ? route.title
-        : route.name === 'search'
-          ? 'Buscar'
-          : route.name === 'explore'
-            ? 'Explorar'
-            : route.name === 'settings'
-              ? 'Ajustes'
-              : '';
+    const fixed: Partial<Record<Route['name'], string>> = { search: 'Buscar', explore: 'Explorar', mylist: 'Mi lista', settings: 'Ajustes' };
+    const title = 'title' in route && typeof route.title === 'string' ? route.title : fixed[route.name] ?? '';
     document.title = title ? `${title} · OpenRTVE` : 'OpenRTVE';
   });
 
@@ -98,6 +91,8 @@
           <screens.search initialQuery={entry.route.query} {active} />
         {:else if entry.route.name === 'explore' && screens.explore}
           <screens.explore {active} scroller={scrollers[key]} />
+        {:else if entry.route.name === 'mylist' && screens.mylist}
+          <screens.mylist scroller={scrollers[key]} />
         {:else if entry.route.name === 'settings' && screens.settings}
           <screens.settings />
         {:else if entry.route.name === 'portada'}

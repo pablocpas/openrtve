@@ -11,6 +11,7 @@ import {
 import { resolvePlayback } from '../domain/playback';
 import { repository } from '../data/repository';
 import { toLoadError } from '../data/http';
+import { favorites } from '../data/favorites.svelte';
 import { watchHistory } from '../data/watchHistory.svelte';
 import { messages } from './messages.svelte';
 import { nav, rememberItem } from './nav.svelte';
@@ -86,6 +87,16 @@ export function removeFromHistory(item: CatalogItem) {
   if (removed) {
     messages.show(`«${removed.item.title}» quitado de Seguir viendo`, {
       action: { label: 'Deshacer', run: () => watchHistory.restore(removed) },
+    });
+  }
+}
+
+/** Quita un título de "Mi lista" y ofrece deshacerlo. */
+export function removeFromMyList(item: CatalogItem) {
+  const removed = favorites.remove(item.id);
+  if (removed) {
+    messages.show(`«${removed.item.title}» quitado de Mi lista`, {
+      action: { label: 'Deshacer', run: () => favorites.restore(removed) },
     });
   }
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
   import FichaFrame from '../components/FichaFrame.svelte';
+  import FavoriteButton from '../components/FavoriteButton.svelte';
   import FichaHeader from '../components/FichaHeader.svelte';
   import Icon from '../components/Icon.svelte';
   import ItemCard from '../components/ItemCard.svelte';
@@ -11,7 +12,7 @@
   import { entryProgress, watchHistory } from '../lib/data/watchHistory.svelte';
   import { detailStructure, isCollection } from '../lib/domain/classification';
   import { episodeOrder, isFirstSeason, type EpisodeOrder } from '../lib/domain/episodeOrder';
-  import type { CatalogItem, ProgramDetail } from '../lib/domain/models';
+  import { referenceItem, type CatalogItem, type ProgramDetail } from '../lib/domain/models';
   import { openItem, play } from '../lib/ui/actions';
   import { recallItem } from '../lib/ui/nav.svelte';
   import { PagedLoader } from '../lib/ui/paged.svelte';
@@ -140,6 +141,12 @@
   });
 
   const synopsis = $derived(htmlToParagraphs(detail?.description));
+
+  /** Lo que guarda "Mi lista" desde esta ficha (ProgramUiState.favoriteItem). */
+  const favoriteItem = $derived.by((): CatalogItem => {
+    const base = known ?? referenceItem(id, 'PROGRAM', title);
+    return { ...base, title: title || base.title, imageUrl: base.imageUrl ?? detail?.imageUrl ?? null, kind: 'PROGRAM' };
+  });
 </script>
 
 <FichaFrame
@@ -172,7 +179,11 @@
                 <Icon name="replay" />
               </button>
             {/if}
+            <FavoriteButton item={favoriteItem} />
           </div>
+        {:else if detail}
+          <!-- Sin nada que reproducir (una colección), "Mi lista" va con su texto. -->
+          <FavoriteButton item={favoriteItem} labeled />
         {/if}
       {/snippet}
     </FichaHeader>

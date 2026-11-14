@@ -24,14 +24,14 @@ const FINISHED_FRACTION = 0.95;
 export const entryProgress = (e: WatchEntry) => (e.durationMs > 0 ? Math.min(1, Math.max(0, e.positionMs / e.durationMs)) : 0);
 export const isInProgress = (e: WatchEntry) => !e.finished && e.positionMs >= MIN_POSITION_MS;
 
-/** Solo lo que hace falta para volver a abrir y reproducir el item. */
+/** Solo lo que hace falta para volver a abrir y reproducir el item (también en "Mi lista"). */
 const STORED_KEYS = [
   'id', 'playbackId', 'assetId', 'title', 'subtitle', 'imageUrl', 'posterUrl', 'kind', 'programId', 'programTypeId',
   'programType', 'mediaTypeId', 'mediaTypeName', 'mediaSubtypeId', 'mediaSubtypeName', 'seasonId', 'seasonTitle',
   'episode', 'drm', 'paid', 'durationMs', 'publicationDate',
 ] as const;
 
-function slim(item: CatalogItem): CatalogItem {
+export function slim(item: CatalogItem): CatalogItem {
   const out: Record<string, unknown> = {};
   for (const key of STORED_KEYS) if (item[key] != null) out[key] = item[key];
   return { allowedInCountry: null, loginRequired: false, paid: false, drm: false, subtitle: null, imageUrl: null, playbackId: null, assetId: null, ...out } as CatalogItem;

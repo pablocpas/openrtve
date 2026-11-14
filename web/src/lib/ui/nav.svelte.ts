@@ -7,12 +7,13 @@ import type { CatalogItem } from '../domain/models';
  * atrás se liberan, como los ViewModelStore de cada entrada en Android.
  */
 
-export type Tab = 'home' | 'search' | 'explore';
+export type Tab = 'home' | 'search' | 'explore' | 'mylist';
 
 export type Route =
   | { name: 'home' }
   | { name: 'search'; query?: string }
   | { name: 'explore' }
+  | { name: 'mylist' }
   | { name: 'settings' }
   | { name: 'portada'; url: string; title: string }
   | { name: 'module'; url: string; presentation: string | null; moduleType: string | null; title: string }
@@ -28,10 +29,15 @@ export interface Entry {
   tab: Tab;
 }
 
-export const ROOT_TABS: Record<Tab, Route> = { home: { name: 'home' }, search: { name: 'search' }, explore: { name: 'explore' } };
+export const ROOT_TABS: Record<Tab, Route> = {
+  home: { name: 'home' },
+  search: { name: 'search' },
+  explore: { name: 'explore' },
+  mylist: { name: 'mylist' },
+};
 
 const rootTab = (route: Route): Tab | null =>
-  route.name === 'home' || route.name === 'search' || route.name === 'explore' ? route.name : null;
+  route.name === 'home' || route.name === 'search' || route.name === 'explore' || route.name === 'mylist' ? route.name : null;
 
 export const isPlayerRoute = (route: Route) => route.name === 'play' || route.name === 'live';
 
@@ -55,6 +61,7 @@ export function routeToPath(route: Route): string {
     case 'home': return '/';
     case 'search': return `/buscar${q({ q: route.query })}`;
     case 'explore': return '/explorar';
+    case 'mylist': return '/mi-lista';
     case 'settings': return '/ajustes';
     case 'portada': return `/portada${q({ u: route.url, t: route.title })}`;
     case 'module': return `/fila${q({ u: route.url, p: route.presentation, m: route.moduleType, t: route.title })}`;
@@ -81,6 +88,7 @@ export function parsePath(path: string): Route {
     case undefined: return { name: 'home' };
     case 'buscar': return { name: 'search', query: get('q') || undefined };
     case 'explorar': return { name: 'explore' };
+    case 'mi-lista': return { name: 'mylist' };
     case 'ajustes': return { name: 'settings' };
     case 'portada': return get('u') ? { name: 'portada', url: get('u'), title: get('t') } : { name: 'home' };
     case 'fila':
@@ -118,7 +126,7 @@ class Navigation {
   entries = $state<Entry[]>([]);
   index = $state(0);
   /** Peticiones a la raíz al volver a pulsar su pestaña activa (subir o enfocar el buscador). */
-  reselect = $state<Record<Tab, number>>({ home: 0, search: 0, explore: 0 });
+  reselect = $state<Record<Tab, number>>({ home: 0, search: 0, explore: 0, mylist: 0 });
 
   current = $derived(this.entries[this.index]);
 

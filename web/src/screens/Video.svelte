@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
   import FichaFrame from '../components/FichaFrame.svelte';
+  import FavoriteButton from '../components/FavoriteButton.svelte';
   import FichaHeader from '../components/FichaHeader.svelte';
   import Icon from '../components/Icon.svelte';
   import ItemCard from '../components/ItemCard.svelte';
@@ -132,6 +133,13 @@
   });
   const programTitle = $derived(detail?.programTitle ?? item.subtitle);
   const synopsis = $derived(htmlToParagraphs(detail?.description));
+
+  /** Lo que guarda "Mi lista" desde esta ficha (VideoUiState.favoriteItem). */
+  const favoriteItem = $derived<CatalogItem>({
+    ...item,
+    imageUrl: item.imageUrl ?? detail?.backdropUrl ?? null,
+    subtitle: item.subtitle ?? detail?.programTitle ?? null,
+  });
 </script>
 
 <FichaFrame title={item.title} shareUrl={detail?.webUrl ?? null} {tabs} {current} onselect={(tab) => (selectedTab = tab)} {scroller}>
@@ -158,6 +166,7 @@
               <Icon name="replay" />
             </button>
           {/if}
+          <FavoriteButton item={favoriteItem} />
         </div>
       {/snippet}
     </FichaHeader>
