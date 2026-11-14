@@ -6,6 +6,10 @@
  * Los originales de `/imagenes/` y `/css/` no admiten `w`: se piden al
  * redimensionador del mismo host, `img.rtve.es/i/?w=&h=&i=`.
  *
+ * Los `/p/` con nombre de fichero (`p/bluey_1028792.png`, logos y cuadradas de
+ * Clan) no se redimensionan por ninguna de las dos vías (503 y 404): se piden tal cual
+ * para no gastar una petición fallida por tarjeta.
+ *
  * El ancho se redondea a escalones de [STEP_PX] para que tarjetas parecidas
  * compartan caché; el alto se escala en la misma proporción.
  */
@@ -23,6 +27,7 @@ export function sizedImage(url: string, widthPx: number, heightPx = 0): string |
   const width = Math.min(Math.ceil(widthPx / STEP_PX) * STEP_PX, MAX_WIDTH_PX);
   const height = heightPx > 0 ? Math.max(1, Math.floor((heightPx * width) / widthPx)) : null;
   const size = [`w=${width}`, ...(height != null ? [`h=${height}`] : [])];
+  if (path.startsWith('p/') && path.includes('.')) return null;
   if (path.startsWith('p/') || path.startsWith('v/') || path.startsWith('i/')) {
     const kept = (queryAt >= 0 ? rest.slice(queryAt + 1) : '')
       .split('&')

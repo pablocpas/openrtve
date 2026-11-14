@@ -8,7 +8,9 @@ import pkg from './package.json' with { type: 'json' };
 /**
  * Escribe en `dist/sw.js` la lista de archivos de la app y una versión ligada a su
  * contenido: el service worker los guarda todos al instalarse (la PWA arranca sin
- * red desde la primera visita) y cada compilación distinta estrena caché.
+ * red desde la primera visita) y cada compilación distinta estrena caché. Los trozos
+ * que la página no carga al arrancar (el reproductor, Shaka) van en una lista aparte
+ * que se descarga con prioridad baja, para no competir con la portada.
  */
 function serviceWorkerPrecache(): Plugin {
   let outDir = 'dist';
@@ -29,13 +31,16 @@ function serviceWorkerPrecache(): Plugin {
       };
       walk(outDir);
       const precache = files.filter((f) => f !== 'sw.js' && !f.startsWith('_') && f !== 'index.html' && !f.endsWith('.map')).sort();
+      const html = readFileSync(join(outDir, 'index.html'), 'utf8');
+      const isLater = (f: string) => f.startsWith('assets/') && /\.(js|css)$/.test(f) && !html.includes(f);
       const version = precache.filter((f) => f.startsWith('assets/')).join('|');
       let hash = 0;
       for (const char of version) hash = (Math.imul(hash, 31) + char.charCodeAt(0)) | 0;
       const swPath = join(outDir, 'sw.js');
       const sw = readFileSync(swPath, 'utf8')
         .replace("'__BUILD_VERSION__'", JSON.stringify(`${pkg.version}-${(hash >>> 0).toString(36)}`))
-        .replace("['__PRECACHE_LIST__']", JSON.stringify(precache.map((f) => `./${f}`)));
+        .replace("['__PRECACHE_LIST__']", JSON.stringify(precache.filter((f) => !isLater(f)).map((f) => `./${f}`)))
+        .replace("['__PRECACHE_LATER__']", JSON.stringify(precache.filter(isLater).map((f) => `./${f}`)));
       writeFileSync(swPath, sw);
     },
   };

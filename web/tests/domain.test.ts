@@ -60,6 +60,8 @@ describe('tamaño de las imágenes', () => {
   it('los estáticos y otros hosts no se tocan', () => {
     expect(sizedImage('https://img.rtve.es/resources/x/1.jpg', 300, 200)).toBeNull();
     expect(sizedImage('https://img2.rtve.es/p/1?w=1', 300, 200)).toBeNull();
+    // RTVE responde 503 a `?w=` en estos y 404 desde su redimensionador.
+    expect(sizedImage('https://img.rtve.es/p/bluey_1028792.png', 300, 300)).toBeNull();
     expect(sizedImage('https://img.rtve.es/p/1?w=1', 0, 0)).toBeNull();
   });
 });

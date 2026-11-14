@@ -79,6 +79,7 @@
       fetchpriority={eager ? 'high' : 'auto'}
       decoding="async"
       class:loaded
+      class:instant={eager}
       onload={() => (loaded = true)}
       {onerror}
       draggable="false"
@@ -115,5 +116,11 @@
 
   img.loaded {
     opacity: 1;
+  }
+
+  /* La imagen principal (el LCP) se pinta según llega, sin fundido que la retrase. */
+  img.instant {
+    opacity: 1;
+    transition: none;
   }
 </style>

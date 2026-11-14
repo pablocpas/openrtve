@@ -10,7 +10,7 @@
   import Panels from '../components/Panels.svelte';
   import TopBar from '../components/TopBar.svelte';
   import { isAbort, toLoadError, type LoadError } from '../lib/data/http';
-  import { NotCachedError, repository } from '../lib/data/repository';
+  import { repository } from '../lib/data/repository';
   import { watchHistory } from '../lib/data/watchHistory.svelte';
   import {
     SEE_ALL_MIN_ITEMS,
@@ -23,12 +23,15 @@
   } from '../lib/domain/models';
   import { openItem, openLink, openRow, play, removeFromHistory } from '../lib/ui/actions';
   import { nav } from '../lib/ui/nav.svelte';
+  import { nearViewport } from '../lib/ui/nearViewport';
   import { errorText, portadaTitle } from '../lib/ui/text';
 
   /**
    * Una portada (`index_apps.json`): la principal o una temática (PortadaViewModel.kt).
    * Primero la copia local, aunque esté caducada: aparece al instante y la red solo
-   * la revalida. Cada fila se carga por separado para que una lenta no bloquee al resto.
+   * la revalida. Cada fila se carga por separado para que una lenta no bloquee al resto,
+   * y solo cuando se acerca a la pantalla: la portada principal tiene más de 30 filas y
+   * la mayoría no se llega a ver.
    */
   let {
     url,
@@ -80,6 +83,17 @@
     });
   }
 
+  /** Filas que ya se han acercado a la pantalla (por su fuente): se cargan y se revalidan. */
+  const activated = new Set<string>();
+
+  function activate(row: HomeRow) {
+    if (isInlineRow(row) || !row.contentUrl || activated.has(row.contentUrl)) return;
+    activated.add(row.contentUrl);
+    if (controller && !controller.signal.aborted) void loadSection(row, false, controller.signal);
+  }
+
+  const isActivated = (row: HomeRow) => !isInlineRow(row) && !!row.contentUrl && activated.has(row.contentUrl);
+
   const initialSection = (row: HomeRow): Section => ({
     row,
     state: isInlineRow(row) ? { type: 'links' } : { type: 'loading' },
@@ -93,6 +107,20 @@
   async function loadSection(row: HomeRow, forceRefresh: boolean, signal: AbortSignal) {
     let state: SectionState;
     let moduleTitle: string | undefined;
+    // Una fila aún sin contenido enseña antes su copia local, si la hay, y luego se revalida.
+    if (!forceRefresh && sections.find((s) => s.row.id === row.id)?.state.type === 'loading') {
+      try {
+        const cached = await repository.loadModule(row, { cachedOnly: true, signal });
+        if (signal.aborted) return;
+        sections = sections.map((s) =>
+          s.row.id === row.id && s.state.type === 'loading'
+            ? { ...s, state: { type: 'loaded', items: cached.value.items, isStale: false }, title: cached.value.title.trim() || s.title }
+            : s,
+        );
+      } catch {
+        // Sin copia de esta fila: la red la traerá.
+      }
+    }
     try {
       const module = await withPermit(() => repository.loadModule(row, { forceRefresh, signal }));
       moduleTitle = module.value.title;
@@ -112,33 +140,18 @@
     const ctrl = new AbortController();
     controller = ctrl;
     const signal = ctrl.signal;
-    let cachedReads: Promise<void>[] = [];
+    // La red y la copia local a la vez: la petición no espera a IndexedDB.
+    const network = repository.loadPortada(url, { forceRefresh, signal });
+    network.catch(() => {});
 
     if (sections.length === 0) {
       try {
         const cached = await repository.loadPortada(url, { cachedOnly: true, signal });
-        const rows = cached.value.rows.filter(isRenderableRow);
         feedTitle = cached.value.title.trim();
-        sections = rows.map(initialSection);
+        sections = cached.value.rows.filter(isRenderableRow).map(initialSection);
         isLoading = false;
-        cachedReads = rows.filter((r) => !isInlineRow(r)).map(async (row) => {
-          try {
-            const module = await repository.loadModule(row, { cachedOnly: true, signal });
-            // Solo si la fila sigue pendiente: la revalidación puede haber llegado antes.
-            sections = sections.map((s) =>
-              s.row.id === row.id && s.state.type === 'loading'
-                ? { ...s, state: { type: 'loaded', items: module.value.items, isStale: false }, title: module.value.title.trim() || s.title }
-                : s,
-            );
-          } catch {
-            // Sin copia de esta fila: la red la traerá.
-          }
-        });
-      } catch (e) {
-        if (signal.aborted) return;
-        if (!(e instanceof NotCachedError)) {
-          // Sin IndexedDB o copia ilegible: se sigue con la red.
-        }
+      } catch {
+        // Sin copia (NotCachedError), sin IndexedDB o copia ilegible: se sigue con la red.
       }
     }
     if (signal.aborted) return;
@@ -148,15 +161,14 @@
     error = null;
     let feed;
     try {
-      feed = await repository.loadPortada(url, { forceRefresh, signal });
+      feed = await network;
     } catch (e) {
       if (isAbort(e) || signal.aborted) return;
       isLoading = false;
       // Con copia local mostrada, un fallo de red solo la marca como antigua.
       isFeedStale = hadSections;
       error = hadSections ? null : toLoadError(e);
-      await Promise.all(cachedReads);
-      for (const s of sections) if (s.state.type === 'loading') void loadSection(s.row, false, signal);
+      for (const s of sections) if (s.state.type === 'loading' && isActivated(s.row)) void loadSection(s.row, false, signal);
       return;
     }
     if (signal.aborted) return;
@@ -171,7 +183,8 @@
     });
     isLoading = false;
     isFeedStale = feed.isStale;
-    for (const row of rows) if (!isInlineRow(row)) void loadSection(row, forceRefresh, signal);
+    // Las que aún no se han acercado a la pantalla se cargarán al llegar a ellas.
+    for (const row of rows) if (isActivated(row)) void loadSection(row, forceRefresh, signal);
   }
 
   function retrySection(row: HomeRow) {
@@ -261,7 +274,12 @@
     {#each sections as section, index (section.row.id)}
       {@const layout = section.row.layout}
       {@const state = section.state}
-      <section class="section" class:hero-section={layout === 'HERO'}>
+      <section
+        class="section"
+        class:hero-section={layout === 'HERO'}
+        class:deferred={index > 1}
+        use:nearViewport={{ root: scroller, key: section.row.contentUrl, onnear: () => activate(section.row) }}
+      >
         {#if layout !== 'HERO' && section.title.trim()}
           <div class="section-head">
             {#if state.type === 'loaded' && state.items.length >= SEE_ALL_MIN_ITEMS}
@@ -328,6 +346,12 @@
 
   .portada.root.no-hero {
     padding-top: 64px;
+  }
+
+  /* Las filas de abajo no se maquetan ni se pintan hasta acercarse. */
+  .section.deferred {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 260px;
   }
 
   .section-head {
