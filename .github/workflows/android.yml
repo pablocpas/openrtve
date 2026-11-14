@@ -1,9 +1,12 @@
 name: Android
 
+# Los cambios que solo tocan la web van por web.yml.
 on:
   push:
     branches: [main]
+    paths-ignore: ['web/**', '.github/workflows/web.yml']
   pull_request:
+    paths-ignore: ['web/**', '.github/workflows/web.yml']
 
 jobs:
   build:

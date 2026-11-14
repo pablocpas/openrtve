@@ -1,0 +1,75 @@
+name: Web
+
+# Cada cambio en web/ se comprueba (tipos, tests y compilación con su presupuesto de
+# tamaño); en main, si todo pasa, lo compilado se publica en Cloudflare Pages
+# (https://openrtve.pages.dev). Se publica el mismo dist/ que se ha probado.
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/web.yml']
+  pull_request:
+    paths: ['web/**', '.github/workflows/web.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Tipos, tests y compilación
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      # Falla si el arranque pasa de su presupuesto de tamaño (vite.config.ts).
+      - run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Publicar en Cloudflare Pages
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://openrtve.pages.dev
+    # Un despliegue a la vez y sin cortar uno a medias: si llegan dos pushes, van en orden.
+    concurrency:
+      group: web-deploy
+      cancel-in-progress: false
+    steps:
+      # wrangler.toml y la función de functions/ salen del repositorio; dist/, de la comprobación.
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.162.0'
+          workingDirectory: web
+          command: pages deploy --branch=main --commit-hash=${{ github.sha }} --commit-dirty=true

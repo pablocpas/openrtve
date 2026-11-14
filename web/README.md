@@ -61,6 +61,21 @@ reproductor, Shaka) va en trozos aparte.
 
 ## Publicar en Cloudflare Pages
 
+Se publica sola: cada push a `main` que toca `web/` pasa por
+[`.github/workflows/web.yml`](../.github/workflows/web.yml), que comprueba tipos,
+tests y compilación (con su presupuesto de tamaño) y, si todo pasa, sube ese mismo
+`dist/` al proyecto `openrtve` de Cloudflare Pages. En los pull requests solo se
+comprueba. También se puede lanzar a mano desde *Actions → Web → Run workflow*.
+
+Necesita dos secretos del repositorio (*Settings → Secrets and variables →
+Actions*):
+
+- `CLOUDFLARE_ACCOUNT_ID`: el id de la cuenta (`npx wrangler whoami`).
+- `CLOUDFLARE_API_TOKEN`: un token de *My Profile → API Tokens → Create Token →
+  Custom token* con el permiso *Account → Cloudflare Pages → Edit*.
+
+A mano, desde un ordenador con sesión en Cloudflare:
+
 ```sh
 npx wrangler login   # una vez
 npm run deploy       # compila y sube dist/ al proyecto "openrtve" (wrangler.toml)
