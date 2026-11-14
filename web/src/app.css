@@ -59,6 +59,27 @@ body {
   height: 100%;
 }
 
+/* La marca de index.html, donde aparece en la portada, mientras llega el JS. */
+.boot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  height: 64px;
+  padding: 0 var(--gutter);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: white;
+}
+
+@media (min-width: 840px) {
+  .boot {
+    left: var(--rail-w);
+  }
+}
+
 button {
   font: inherit;
   color: inherit;

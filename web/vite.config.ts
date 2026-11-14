@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { defineConfig, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import pkg from './package.json' with { type: 'json' };
@@ -36,6 +37,7 @@ function serviceWorkerPrecache(): Plugin {
       const version = precache.filter((f) => f.startsWith('assets/')).join('|');
       let hash = 0;
       for (const char of version) hash = (Math.imul(hash, 31) + char.charCodeAt(0)) | 0;
+      checkStartupBudget(outDir, precache.filter((f) => f.startsWith('assets/') && !isLater(f)));
       const swPath = join(outDir, 'sw.js');
       const sw = readFileSync(swPath, 'utf8')
         .replace("'__BUILD_VERSION__'", JSON.stringify(`${pkg.version}-${(hash >>> 0).toString(36)}`))
@@ -44,6 +46,23 @@ function serviceWorkerPrecache(): Plugin {
       writeFileSync(swPath, sw);
     },
   };
+}
+
+/**
+ * Lo que se descarga para arrancar, comprimido, no puede crecer sin darse cuenta: la
+ * compilación falla si se pasa. Si hace falta más, que sea en un trozo aparte.
+ */
+const STARTUP_BUDGET_KB = { js: 55, css: 8 };
+
+function checkStartupBudget(outDir: string, startup: string[]) {
+  const gzipKb = (ext: string) =>
+    startup.filter((f) => f.endsWith(ext)).reduce((sum, f) => sum + gzipSync(readFileSync(join(outDir, f)), { level: 9 }).length, 0) / 1024;
+  const js = gzipKb('.js');
+  const css = gzipKb('.css');
+  console.log(`Arranque: ${js.toFixed(1)} KB de JS y ${css.toFixed(1)} KB de CSS (gzip)`);
+  if (js > STARTUP_BUDGET_KB.js || css > STARTUP_BUDGET_KB.css) {
+    throw new Error(`El arranque supera el presupuesto (${STARTUP_BUDGET_KB.js} KB de JS, ${STARTUP_BUDGET_KB.css} KB de CSS)`);
+  }
 }
 
 /** Lo mismo que hace la función de Cloudflare (functions/rtve-proxy/recomsys), para desarrollo. */

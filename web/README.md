@@ -33,6 +33,10 @@ npm test           # lógica; con LIVE=1 también contra la API real de RTVE
 npm run check      # tipos
 ```
 
+`npm run build` falla si lo que se descarga para arrancar pasa de 55 KB de JS o 8 KB de
+CSS comprimidos (`STARTUP_BUDGET_KB` en `vite.config.ts`): lo demás (pantallas,
+reproductor, Shaka) va en trozos aparte.
+
 ## Publicar en Cloudflare Pages
 
 ```sh

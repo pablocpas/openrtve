@@ -19,7 +19,9 @@ function takeSharedLink() {
 takeSharedLink();
 nav.init();
 
-const app = mount(App, { target: document.getElementById('app')! });
+const target = document.getElementById('app')!;
+target.replaceChildren();
+const app = mount(App, { target });
 
 // La PWA funciona sin conexión con lo último que se vio; el service worker solo
 // guarda la propia app (el catálogo vive en IndexedDB y el vídeo nunca se guarda).

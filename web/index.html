@@ -23,7 +23,8 @@
     <title>OpenRTVE</title>
   </head>
   <body>
-    <div id="app"></div>
+    <!-- Lo primero que se pinta, sin esperar al JS; la app lo sustituye al arrancar. -->
+    <div id="app"><div class="boot" aria-hidden="true">OpenRTVE</div></div>
     <noscript>OpenRTVE necesita JavaScript para funcionar.</noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
