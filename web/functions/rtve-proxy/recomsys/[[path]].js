@@ -5,7 +5,7 @@
  * páginas de `www.rtve.es`, así que el navegador no puede pedirlo directamente. La app
  * lo pide aquí (`/rtve-proxy/recomsys/recommendation/...`) y esta función lo reenvía.
  *
- * Solo esto se ejecuta en Cloudflare; el resto de la web es estático. Está acotada:
+ * Esta función solo reenvía recomendaciones; las métricas tienen su propio endpoint. Está acotada:
  * - únicamente rutas `recommendation/<tipo>` de recomsys, con GET;
  * - solo peticiones de la propia web (otras páginas no pueden usarla de proxy);
  * - cada respuesta se guarda 5 minutos en la caché de Cloudflare, así que RTVE recibe

@@ -1,5 +1,6 @@
 <script lang="ts">
   import TopBar from '../components/TopBar.svelte';
+  import PlaybackMetricsInfo from '../components/PlaybackMetricsInfo.svelte';
   import { documentCache } from '../lib/data/documentCache';
   import { QUALITY_CHOICES, settings } from '../lib/data/settings.svelte';
   import { contentNotice } from '../lib/ui/contentNotice.svelte';
@@ -105,6 +106,16 @@
       <span class="summary">Catálogo e imágenes guardados: {cacheBytes == null ? '…' : formatBytes(cacheBytes)}</span>
     </span>
   </button>
+
+  <hr />
+  <h2 class="label">Privacidad</h2>
+  <div class="row">
+    <div class="text">
+      <span class="title">Estadísticas agregadas de reproducción</span>
+      <span class="summary">Contenidos y tiempo de reproducción, sin perfiles de usuario ni cookies de seguimiento.</span>
+      <PlaybackMetricsInfo />
+    </div>
+  </div>
 
   <hr />
   <h2 class="label">Acerca de</h2>

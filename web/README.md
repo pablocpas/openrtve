@@ -16,7 +16,10 @@ las fichas y "Seguir viendo".
 - **Las recomendaciones de RTVE** (`recomsys`: Similares, búsquedas predefinidas y
   rankings), que solo responden a páginas de `www.rtve.es`. Las reenvía
   `functions/rtve-proxy/recomsys/`, una Cloudflare Pages Function: solo esas rutas, solo
-  para la propia app y con 5 minutos de caché. Es lo único que se ejecuta en Cloudflare.
+  para la propia app y con 5 minutos de caché.
+- **Los contadores de reproducción**, en `functions/api/playback-metrics.js`: incrementos
+  de reproducciones y tiempo que se agregan en una base D1 privada. No pasan vídeos
+  por este endpoint.
 
 El catálogo, las imágenes, el vídeo y las licencias van directos del navegador de cada
 usuario a RTVE.
@@ -30,6 +33,11 @@ El aviso y **Ajustes → Derechos y solicitudes de retirada** muestran el correo
 contacto del responsable del proyecto y abren un mensaje con el asunto y los campos
 para identificar el contenido y el motivo de la solicitud. Ambos usan el contacto
 de `src/lib/ui/rightsContact.ts`.
+
+El aviso y **Ajustes → Privacidad** explican las métricas de reproducción. No hay
+cookies de seguimiento, identificadores de personas ni un historial central por
+espectador. Se respetan DNT y Global Privacy Control. Detalles y consultas en
+[docs/metricas-reproduccion.md](docs/metricas-reproduccion.md).
 
 ## Rendimiento
 
@@ -98,3 +106,7 @@ revalidados) y las cabeceras de seguridad. En otro alojamiento hay que reenviar
 búsquedas predefinidas y las filas de rankings muestran un error.
 
 Para probar la función en local: `npm run build && npx wrangler pages dev dist`.
+
+La base D1 de métricas debe tener aplicada la migración antes del despliegue:
+`npx wrangler d1 migrations apply PLAYBACK_METRICS --remote`.
+Para probarla sin tocar producción, usa `--local` y luego `wrangler pages dev dist`.

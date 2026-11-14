@@ -2,6 +2,7 @@
   import { onDestroy, onMount, tick } from 'svelte';
   import Icon from '../components/Icon.svelte';
   import { repository } from '../lib/data/repository';
+  import { trackPlayback } from '../lib/data/playbackMetrics';
   import { settings } from '../lib/data/settings.svelte';
   import { isInProgress, watchHistory } from '../lib/data/watchHistory.svelte';
   import { canHaveNextEpisode } from '../lib/domain/classification';
@@ -78,6 +79,7 @@
   let hideTimer: ReturnType<typeof setTimeout> | null = null;
   let saveTimer: ReturnType<typeof setInterval> | null = null;
   let wakeLock: WakeLockSentinel | null = null;
+  let playbackMetrics: ReturnType<typeof trackPlayback> | null = null;
   const extras = new AbortController();
 
   const atLiveEdge = $derived(isLive && seekEnd - currentTime <= LIVE_EDGE_TOLERANCE_S);
@@ -162,6 +164,10 @@
     if (!('MediaSource' in window) && 'ManagedMediaSource' in window && video) video.disableRemotePlayback = true;
     player = new shakaLib.Player();
     await player.attach(video);
+    playbackMetrics = trackPlayback(video!, {
+      contentId: props.kind === 'live' ? props.assetId : decision.videoId ?? props.id,
+      title, kind: props.kind === 'live' ? 'live' : 'vod',
+    });
     player.setVideoContainer(textContainer);
     player.addEventListener('error', (e: { detail: ShakaError }) => onError(e.detail));
     player.addEventListener('buffering', (e: { buffering: boolean }) => (buffering = e.buffering));
@@ -241,6 +247,8 @@
   }
 
   async function retry() {
+    playbackMetrics?.destroy();
+    playbackMetrics = null;
     errorMessage = null;
     usedFallback = false;
     if (player) {
@@ -723,6 +731,7 @@
 
   onDestroy(() => {
     destroyed = true;
+    playbackMetrics?.destroy();
     saveProgress();
     watchHistory.flush();
     extras.abort();

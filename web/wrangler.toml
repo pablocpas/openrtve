@@ -1,4 +1,10 @@
-# Cloudflare Pages: archivos estáticos (dist/) y una función (functions/) que reenvía recomsys.
+# Cloudflare Pages: app estática, proxy de recomendaciones y contadores de reproducción.
 name = "openrtve"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "PLAYBACK_METRICS"
+database_name = "openrtve-playback-metrics"
+database_id = "9b0d5612-0a39-44e7-92fa-d37c7ab5e8d8"
+migrations_dir = "migrations"

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PlaybackMetricsInfo from './PlaybackMetricsInfo.svelte';
   import { contentNotice } from '../lib/ui/contentNotice.svelte';
   import { rightsContactEmail, rightsContactUrl } from '../lib/ui/rightsContact';
 
@@ -9,7 +10,9 @@
     if (!dialog) return;
     if (contentNotice.open && !dialog.open) {
       dialog.showModal();
-      continueButton?.focus();
+      continueButton?.focus({ preventScroll: true });
+      dialog.scrollTop = 0;
+      dialog.querySelector('.description')?.scrollTo(0, 0);
     } else if (!contentNotice.open && dialog.open) {
       dialog.close();
     }
@@ -38,6 +41,8 @@
       Para cuestiones de derechos o solicitudes de retirada de enlaces, contacta con el responsable de OpenRTVE en
       <a href={rightsContactUrl}>{rightsContactEmail}</a>, indicando el contenido afectado y el motivo de la solicitud.
     </p>
+    <p>Medimos las reproducciones y su duración, sin perfiles de usuario.</p>
+    <PlaybackMetricsInfo />
   </div>
   <div class="actions">
     <a class="btn btn-tonal" href="https://www.rtve.es/play/">Ir a RTVE Play</a>
@@ -52,7 +57,7 @@
     max-height: calc(100dvh - 32px);
     margin: auto;
     padding: clamp(24px, 4vw, 32px);
-    overflow: auto;
+    overflow: hidden;
     overscroll-behavior: contain;
     border: 1px solid var(--outline);
     border-radius: var(--radius-lg);
@@ -65,7 +70,13 @@
     background: rgb(0 0 0 / 0.8);
   }
 
+  dialog[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
   .eyebrow {
+    flex-shrink: 0;
     margin-bottom: 8px;
     color: var(--accent);
     font-size: 0.85rem;
@@ -73,12 +84,17 @@
   }
 
   h2 {
+    flex-shrink: 0;
     margin-bottom: 20px;
     font-size: clamp(1.4rem, 4vw, 1.7rem);
     line-height: 1.2;
   }
 
   .description {
+    min-height: 0;
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--outline) var(--surface);
     display: grid;
     gap: 14px;
     color: var(--muted);
@@ -92,6 +108,7 @@
   }
 
   .actions {
+    flex-shrink: 0;
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;

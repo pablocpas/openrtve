@@ -1,4 +1,4 @@
-const KEY = 'openrtve.content-notice.v1';
+const KEY = 'openrtve.content-notice.v2';
 
 function alreadyRead(): boolean {
   try {

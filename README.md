@@ -185,12 +185,18 @@ En Firefox de escritorio se usa como una web normal: Firefox no instala PWA.
 
 ### Privacidad
 
-Sin cuenta, sin cookies y sin analítica. "Seguir viendo", "Mi lista" y los
+Sin cuenta ni cookies de seguimiento. "Seguir viendo", "Mi lista" y los
 ajustes se guardan solo en ese navegador: no se sincronizan con otros
 dispositivos ni con la app de Android. El catálogo, las imágenes, el vídeo y las
-licencias van directos del navegador a RTVE; lo único que pasa por el servidor
-de la web son las recomendaciones de RTVE (Similares, búsquedas predefinidas y
-rankings), que RTVE solo sirve a su propio dominio.
+licencias van directos del navegador a RTVE. Por el servidor de la web pasan las
+recomendaciones de RTVE (Similares, búsquedas predefinidas y rankings), que RTVE
+solo sirve a su propio dominio, y las métricas agregadas de reproducción.
+
+Estas métricas suman reproducciones, llegadas al final y tiempo por contenido y
+día en una base privada de Cloudflare. No guardan IP ni identificadores de usuario
+y respetan DNT y Global Privacy Control. El aviso inicial y Ajustes informan del
+tratamiento; su funcionamiento y conservación se detallan en
+[Métricas de reproducción](web/docs/metricas-reproduccion.md).
 
 La web está en [`web/`](web/): cómo desarrollarla, probarla y publicar tu propia
 copia, en su [README](web/README.md).
