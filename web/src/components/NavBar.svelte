@@ -51,8 +51,8 @@
     display: flex;
     justify-content: space-around;
     align-items: center;
-    background: rgb(20 22 32 / 0.96);
-    backdrop-filter: blur(16px);
+    /* Sin backdrop-filter: casi opaca, el desenfoque apenas se veía y en el móvil se recalculaba en cada fotograma del scroll. */
+    background: rgb(20 22 32 / 0.98);
     border-top: 1px solid rgb(255 255 255 / 0.04);
   }
 
@@ -107,7 +107,6 @@
       border-top: 0;
       border-right: 1px solid rgb(255 255 255 / 0.04);
       background: var(--bg);
-      backdrop-filter: none;
     }
 
     .brand {

@@ -109,8 +109,7 @@
   }
 
   .bar.collapsed {
-    background: rgb(9 10 15 / 0.94);
-    backdrop-filter: blur(12px);
+    background: rgb(9 10 15 / 0.97);
   }
 
   .veil {

@@ -23,8 +23,7 @@
     gap: 8px;
     height: 64px;
     padding: 0 calc(var(--gutter) - 8px);
-    background: rgb(9 10 15 / 0.92);
-    backdrop-filter: blur(12px);
+    background: rgb(9 10 15 / 0.97);
   }
 
   h1 {

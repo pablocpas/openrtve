@@ -147,8 +147,10 @@
       --backdrop-h: min(56.25vw, 78vh);
     }
 
+    /* El borde izquierdo de la imagen se funde con el fondo: sin máscara asomaba una línea de 1 px. */
     .backdrop {
       left: 18%;
+      mask-image: linear-gradient(to right, transparent 0, #000 22%);
     }
 
     .shade {

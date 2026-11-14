@@ -276,8 +276,7 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    background: rgb(9 10 15 / 0.94);
-    backdrop-filter: blur(12px);
+    background: rgb(9 10 15 / 0.97);
     padding-bottom: 12px;
   }
 
