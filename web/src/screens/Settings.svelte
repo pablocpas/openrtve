@@ -2,6 +2,7 @@
   import TopBar from '../components/TopBar.svelte';
   import { documentCache } from '../lib/data/documentCache';
   import { QUALITY_CHOICES, settings } from '../lib/data/settings.svelte';
+  import { contentNotice } from '../lib/ui/contentNotice.svelte';
   import { messages } from '../lib/ui/messages.svelte';
   import { formatBytes } from '../lib/ui/text';
 
@@ -112,6 +113,12 @@
       <span class="summary">Cliente independiente para el catálogo público de RTVE Play. No está afiliado a RTVE.</span>
     </span>
   </div>
+  <button class="row action" onclick={() => contentNotice.show()}>
+    <span class="text">
+      <span class="title">Aviso sobre los contenidos</span>
+      <span class="summary">Independencia del proyecto, origen de los vídeos y derechos de sus titulares</span>
+    </span>
+  </button>
 </div>
 
 <style>

@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import ContentNotice from './components/ContentNotice.svelte';
   import NavBar from './components/NavBar.svelte';
   import Toast from './components/Toast.svelte';
   import { RtveUrls } from './lib/domain/models';
   import { openIncomingLink } from './lib/ui/actions';
+  import { contentNotice } from './lib/ui/contentNotice.svelte';
   import { isPlayerRoute, nav, routeToPath, screenKey, type Entry, type Route } from './lib/ui/nav.svelte';
   import { loadPlayerScreen } from './lib/ui/playerPreload';
   import Portada from './screens/Portada.svelte';
@@ -56,7 +58,7 @@
    */
   const activeKey = $derived(screenKey(nav.background));
   const playerEntry = $derived(nav.current && isPlayerRoute(nav.current.route) ? nav.current : null);
-  const playerModule = $derived(playerEntry ? loadPlayerScreen() : null);
+  const playerModule = $derived(playerEntry && !contentNotice.open ? loadPlayerScreen() : null);
 
   const scrollers: Record<string, HTMLElement | undefined> = $state({});
 
@@ -130,6 +132,7 @@
 {/if}
 
 <Toast />
+<ContentNotice />
 
 <style>
   .app {

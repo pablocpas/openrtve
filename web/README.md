@@ -21,6 +21,11 @@ las fichas y "Seguir viendo".
 El catálogo, las imágenes, el vídeo y las licencias van directos del navegador de cada
 usuario a RTVE.
 
+Al entrar se muestra un aviso sobre la independencia del proyecto, el origen de los
+vídeos y los derechos de sus titulares. Se recuerda durante la sesión de esa pestaña
+y puede volver a abrirse desde **Ajustes → Aviso sobre los contenidos**. Un enlace
+directo a un vídeo no inicia el reproductor hasta cerrar el aviso.
+
 ## Rendimiento
 
 Decisiones medidas que conviene no deshacer sin volver a medir:
