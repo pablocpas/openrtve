@@ -1,0 +1,23 @@
+{
+  "name": "OpenRTVE",
+  "short_name": "OpenRTVE",
+  "description": "Cliente libre de RTVE Play: televisión, directos y archivo de RTVE.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#090a0f",
+  "theme_color": "#090a0f",
+  "categories": ["entertainment", "video"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "share_target": {
+    "action": "./",
+    "method": "GET",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  }
+}

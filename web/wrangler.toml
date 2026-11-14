@@ -1,0 +1,4 @@
+# Cloudflare Pages: archivos estáticos (dist/) y una función (functions/) que reenvía recomsys.
+name = "openrtve"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-10-01"
