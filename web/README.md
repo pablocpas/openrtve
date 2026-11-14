@@ -1,5 +1,9 @@
 # OpenRTVE web
 
+En producción en **[openrtve.pages.dev](https://openrtve.pages.dev)**. Cómo usarla e
+instalarla como app, en el [README principal](../README.md#web); aquí, lo necesario
+para desarrollarla y publicarla.
+
 La app de OpenRTVE como web instalable (PWA), para escritorio, Android e iPhone/iPad.
 Svelte 5 + TypeScript + Vite, con Shaka Player para el vídeo. La lógica es la de la app
 de Android, portada: mismas reglas de clasificación, orden de episodios, secciones de
@@ -16,6 +20,24 @@ las fichas y "Seguir viendo".
 
 El catálogo, las imágenes, el vídeo y las licencias van directos del navegador de cada
 usuario a RTVE.
+
+## Rendimiento
+
+Decisiones medidas que conviene no deshacer sin volver a medir:
+
+- **Imágenes en las variantes de la web oficial** (`src/lib/data/imageSizing.ts`):
+  `v/{id}/?w=400`, `p/{id}/imgposter/?h=400`, `?w=1600` en cabeceras… El servicio
+  de RTVE redimensiona al vuelo: una variante que nadie ha pedido tarda de medio
+  segundo a seis (o responde 503); las que pide www.rtve.es ya están hechas y salen
+  en ~50 ms. Pedir "el tamaño justo" de cada tarjeta era más lento, no más rápido.
+- **La portada carga primero las filas visibles** y el resto en segundo plano, de
+  una en una, con la página ya cargada y el scroll quieto. Cargarlas al llegar a
+  ellas cortaba la inercia del scroll en el móvil.
+- **Sin `content-visibility` ni `backdrop-filter`**: el primero hacía que las filas
+  cambiasen de alto al pintarse (la página saltaba al deslizar); el segundo se
+  recalculaba en cada fotograma bajo las barras fijas y fallaba al repintar.
+- **El service worker** guarda la app (el reproductor y Shaka, con prioridad baja)
+  y las imágenes de RTVE, como la caché de disco de Coil en Android.
 
 ## Vídeo y DRM
 

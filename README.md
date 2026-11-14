@@ -4,10 +4,18 @@
 
 # OpenRTVE
 
-Cliente libre de **RTVE Play** para Android y Android TV. Consulta y reproduce el
-catálogo público de vídeo de RTVE (televisión, directos y archivo) a través de
-sus interfaces HTTP, con una interfaz propia en Jetpack Compose. La radio y los
-pódcasts quedan fuera a propósito: como en la app oficial, son cosa de RTVE Audio.
+Cliente libre de **RTVE Play** para Android, Android TV y cualquier navegador
+(iPhone, iPad, Mac, Windows, Linux…). Consulta y reproduce el catálogo público de
+vídeo de RTVE (televisión, directos y archivo) a través de sus interfaces HTTP,
+con una interfaz propia: Jetpack Compose en Android y Svelte en la web. La radio y
+los pódcasts quedan fuera a propósito: como en la app oficial, son cosa de RTVE Audio.
+
+## Dónde usarlo
+
+| Dispositivo | Cómo |
+| --- | --- |
+| Android y Android TV | App nativa: el APK de [*Releases*](#instalar-en-android) |
+| iPhone, iPad, ordenador y cualquier otro | Web: **[openrtve.pages.dev](https://openrtve.pages.dev)**, instalable como app ([más abajo](#web)) |
 
 OpenRTVE no está afiliado a RTVE ni respaldado por ella. RTVE Play es una marca
 de la Corporación de Radio y Televisión Española.
@@ -39,7 +47,12 @@ de la Corporación de Radio y Televisión Española.
   bloque, paginados; **categorías** leídas de la configuración remota de RTVE.
 - **Directos** con logo del canal, "● Directo" y progreso de la emisión;
   los programados muestran su horario. **Seguir viendo** local, sin cuenta:
-  tocar continúa; desde su menú se abre la ficha o se quita (con deshacer).
+  tocar continúa; desde su menú se abre la ficha, se empieza desde el principio
+  o se quita (con deshacer).
+- **Mi lista**, también local y sin cuenta: "+" junto a Reproducir en cada
+  ficha, pestaña propia con lo guardado y "Quitar de Mi lista" con deshacer. En
+  la TV, una pulsación larga de OK sobre cualquier tarjeta abre su menú (Mi
+  lista y Ver ficha).
 - **Reproductor** Media3 apaisado a pantalla completa, con panel de ajustes (calidad, velocidad, audio,
   subtítulos), miniaturas al arrastrar, siguiente episodio con reproducción
   automática, ajuste de imagen, imagen en imagen, bloqueo, gestos (doble
@@ -52,11 +65,12 @@ de la Corporación de Radio y Televisión Española.
 - **Ajustes**: imagen en imagen, calidad máxima,
   reproducción automática, subtítulos por defecto y borrado de caché.
 - **Rápida y ligera**: catálogo en caché con revalidación por ETag (la portada
-  aparece al instante con la última copia), todas las imágenes pedidas al
-  tamaño en que se pintan, caché de imágenes ajustada a la cuota que Android da
-  a la app, un solo cliente HTTP/2 para catálogo, imágenes y vídeo, y Baseline
-  Profile para un arranque en frío rápido. Allowlist estricta de hosts para la
-  API y las imágenes.
+  aparece al instante con la última copia); imágenes en las mismas variantes que
+  pide la web oficial de RTVE, que su servicio ya tiene hechas y sirve al
+  momento en vez de redimensionarlas al vuelo; caché de imágenes ajustada a la
+  cuota que Android da a la app; un solo cliente HTTP/2 para catálogo, imágenes
+  y vídeo, y Baseline Profile para un arranque en frío rápido. Allowlist
+  estricta de hosts para la API y las imágenes.
 
 Todo se deduce de los feeds públicos de RTVE: no hay listas compiladas de
 canales, categorías ni filtros.
@@ -89,7 +103,17 @@ canales, categorías ni filtros.
 | [<img src="docs/assets/screenshots/tv-explore.png" width="380" alt="Explorar en Android TV">](docs/assets/screenshots/tv-explore.png)<br>Explorar | [<img src="docs/assets/screenshots/tv-movie.png" width="380" alt="Ficha de película en Android TV">](docs/assets/screenshots/tv-movie.png)<br>Ficha de película |
 | [<img src="docs/assets/screenshots/tv-search.png" width="380" alt="Buscar en Android TV">](docs/assets/screenshots/tv-search.png)<br>Buscar | [<img src="docs/assets/screenshots/tv-player.png" width="380" alt="Reproductor en Android TV">](docs/assets/screenshots/tv-player.png)<br>Reproductor |
 
-## Instalar
+### Web (móvil y escritorio)
+
+| Móvil: Inicio | Móvil: ficha | Móvil: Mi lista |
+| :---: | :---: | :---: |
+| [<img src="docs/assets/screenshots/web-phone-home.png" width="220" alt="Inicio de la web en el móvil">](docs/assets/screenshots/web-phone-home.png) | [<img src="docs/assets/screenshots/web-phone-program.png" width="220" alt="Ficha de programa en la web, en el móvil">](docs/assets/screenshots/web-phone-program.png) | [<img src="docs/assets/screenshots/web-phone-mylist.png" width="220" alt="Mi lista en la web, en el móvil">](docs/assets/screenshots/web-phone-mylist.png) |
+
+| Escritorio: Inicio | Escritorio: ficha |
+| :---: | :---: |
+| [<img src="docs/assets/screenshots/web-desktop-home.png" width="380" alt="Inicio de la web en el escritorio">](docs/assets/screenshots/web-desktop-home.png) | [<img src="docs/assets/screenshots/web-desktop-program.png" width="380" alt="Ficha de programa en la web, en el escritorio">](docs/assets/screenshots/web-desktop-program.png) |
+
+## Instalar en Android
 
 Descarga el APK de la sección *Releases* e instálalo en el móvil o en la TV
 (en Android TV, por ejemplo con *Downloader* o `adb install`). La app detecta si
@@ -100,8 +124,62 @@ OpenRTVE requiere activarlo en *Ajustes → Aplicaciones → OpenRTVE → Abrir 
 defecto* (RTVE no publica la verificación de dominio para terceros). La vía
 "Compartir → OpenRTVE" funciona siempre.
 
+## Web
+
+**[openrtve.pages.dev](https://openrtve.pages.dev)**: la misma app para todo lo
+que no es Android (iPhone, iPad, Mac, Windows, Linux, Chromebook), sin instalar
+nada. Comparte con Android las reglas de clasificación, el orden de episodios,
+las secciones de las fichas, "Seguir viendo" y "Mi lista": no es una versión
+recortada.
+
+### Instalarla como app
+
+Es una PWA: instalada se abre a pantalla completa, con su icono, y arranca sin
+red con lo último que se vio.
+
+| Dónde | Cómo |
+| --- | --- |
+| iPhone y iPad (Safari) | *Compartir* → *Añadir a pantalla de inicio* |
+| Android (Chrome) | Menú ⋮ → *Instalar aplicación* (o *Añadir a pantalla de inicio*) |
+| Ordenador (Chrome, Edge, Brave) | Icono de instalar en la barra de direcciones |
+| Mac (Safari 17 o posterior) | *Archivo* → *Añadir al Dock* |
+
+En Firefox de escritorio se usa como una web normal: Firefox no instala PWA.
+
+### Qué incluye
+
+- Inicio, Buscar, Explorar, Mi lista y Ajustes, con barra inferior en el móvil y
+  panel lateral en pantallas anchas; fichas de programa y de vídeo con sus
+  pestañas; "Seguir viendo".
+- Reproductor con calidad, velocidad, audio y subtítulos, miniaturas al
+  arrastrar, siguiente episodio, imagen en imagen, pantalla completa (apaisada en
+  Android; en iPhone, la del propio sistema) y doble toque a los lados para saltar 10 s. Con teclado: espacio o
+  `K` reproduce y pausa, `←` `→` (o `J` `L`) saltan 10 s, `↑` `↓` volumen, `F`
+  pantalla completa, `M` silencio, `C` subtítulos, `N` siguiente episodio e `I`
+  imagen en imagen.
+- Enlaces de RTVE: en Android, *Compartir → OpenRTVE* con la web instalada abre
+  la ficha, como en la app.
+
+| Navegador | Contenido protegido |
+|---|---|
+| Chrome, Edge, Firefox, Brave (escritorio y Android) | Widevine |
+| Safari (iPhone/iPad con iOS 17.1 o posterior, Mac) | Variante sin cifrar que RTVE publica para dispositivos sin Widevine (misma calidad) |
+
+### Privacidad
+
+Sin cuenta, sin cookies y sin analítica. "Seguir viendo", "Mi lista" y los
+ajustes se guardan solo en ese navegador: no se sincronizan con otros
+dispositivos ni con la app de Android. El catálogo, las imágenes, el vídeo y las
+licencias van directos del navegador a RTVE; lo único que pasa por el servidor
+de la web son las recomendaciones de RTVE (Similares, búsquedas predefinidas y
+rankings), que RTVE solo sirve a su propio dominio.
+
+La web está en [`web/`](web/): cómo desarrollarla, probarla y publicar tu propia
+copia, en su [README](web/README.md).
+
 ## Compilar
 
+Esto es la app de Android; la web se compila aparte (ver [`web/README.md`](web/README.md)).
 Con el SDK de Android instalado:
 
 ```bash
@@ -170,6 +248,10 @@ comportamiento:
   paginación, textos);
 - `ui/mobile` y `ui/tv`: los dos árboles de interfaz, que comparten todo lo demás;
 - `playback`: ExoPlayer, `MediaSessionService`, controles y gestos.
+
+La web (`web/`) es un proyecto aparte en Svelte 5, TypeScript y Vite, con Shaka
+Player: porta la misma lógica de dominio (clasificación, orden de episodios,
+secciones de las fichas, política de reproducción) en vez de compartir código.
 
 No se añadirán módulos Gradle, base de datos ni framework de inyección hasta
 que una función real los justifique. Las decisiones se amplían en
