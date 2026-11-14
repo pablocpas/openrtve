@@ -23,15 +23,16 @@
   } from '../lib/domain/models';
   import { openItem, openLink, openRow, play, removeFromHistory } from '../lib/ui/actions';
   import { nav } from '../lib/ui/nav.svelte';
+  import { whenIdle } from '../lib/ui/idle';
   import { nearViewport } from '../lib/ui/nearViewport';
   import { errorText, portadaTitle } from '../lib/ui/text';
 
   /**
    * Una portada (`index_apps.json`): la principal o una temática (PortadaViewModel.kt).
    * Primero la copia local, aunque esté caducada: aparece al instante y la red solo
-   * la revalida. Cada fila se carga por separado para que una lenta no bloquee al resto,
-   * y solo cuando se acerca a la pantalla: la portada principal tiene más de 30 filas y
-   * la mayoría no se llega a ver.
+   * la revalida. Cada fila se carga por separado para que una lenta no bloquee al resto.
+   * Primero las que se ven (la portada principal tiene más de 30 filas) y después, en
+   * segundo plano, las demás: al bajar ya están pintadas.
    */
   let {
     url,
@@ -90,6 +91,35 @@
     if (isInlineRow(row) || !row.contentUrl || activated.has(row.contentUrl)) return;
     activated.add(row.contentUrl);
     if (controller && !controller.signal.aborted) void loadSection(row, false, controller.signal);
+  }
+
+  /**
+   * Las filas que aún no se han acercado a la pantalla se cargan después, de una en
+   * una y cuando el navegador queda libre. Cargarlas justo al llegar a ellas cambiaba la
+   * página mientras se deslizaba y en el móvil cortaba la inercia del scroll. Empiezan
+   * cuando ya han llegado las visibles y la página ha terminado de cargar, para no
+   * quitarle red a la imagen principal.
+   */
+  let backgroundRun = 0;
+  let lastScrollAt = 0;
+  function loadRestInBackground(signal: AbortSignal, first: Promise<unknown>[]) {
+    const run = ++backgroundRun;
+    const next = () => {
+      if (signal.aborted || run !== backgroundRun) return;
+      // Nunca a mitad de un deslizamiento: se espera a que el scroll se quede quieto.
+      if (performance.now() - lastScrollAt < 400) {
+        setTimeout(() => whenIdle(next), 400);
+        return;
+      }
+      const row = sections.map((s) => s.row).find((r) => !isInlineRow(r) && r.contentUrl && !activated.has(r.contentUrl));
+      if (!row?.contentUrl) return;
+      activated.add(row.contentUrl);
+      void loadSection(row, false, signal).finally(() => whenIdle(next));
+    };
+    const pageLoaded = new Promise<void>((resolve) =>
+      document.readyState === 'complete' ? resolve() : window.addEventListener('load', () => resolve(), { once: true }),
+    );
+    void Promise.allSettled([...first, pageLoaded]).then(() => setTimeout(() => whenIdle(next, 4000), 1000));
   }
 
   const isActivated = (row: HomeRow) => !isInlineRow(row) && !!row.contentUrl && activated.has(row.contentUrl);
@@ -168,7 +198,8 @@
       // Con copia local mostrada, un fallo de red solo la marca como antigua.
       isFeedStale = hadSections;
       error = hadSections ? null : toLoadError(e);
-      for (const s of sections) if (s.state.type === 'loading' && isActivated(s.row)) void loadSection(s.row, false, signal);
+      const first = sections.filter((s) => s.state.type === 'loading' && isActivated(s.row)).map((s) => loadSection(s.row, false, signal));
+      loadRestInBackground(signal, first);
       return;
     }
     if (signal.aborted) return;
@@ -183,8 +214,8 @@
     });
     isLoading = false;
     isFeedStale = feed.isStale;
-    // Las que aún no se han acercado a la pantalla se cargarán al llegar a ellas.
-    for (const row of rows) if (isActivated(row)) void loadSection(row, forceRefresh, signal);
+    const first = rows.filter(isActivated).map((row) => loadSection(row, forceRefresh, signal));
+    loadRestInBackground(signal, first);
   }
 
   function retrySection(row: HomeRow) {
@@ -229,9 +260,12 @@
 
   let scrolled = $state(false);
   $effect(() => {
-    if (!scroller || !isRoot) return;
+    if (!scroller) return;
     const el = scroller;
-    const onScroll = () => (scrolled = el.scrollTop > 120);
+    const onScroll = () => {
+      lastScrollAt = performance.now();
+      if (isRoot) scrolled = el.scrollTop > 120;
+    };
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
   });
