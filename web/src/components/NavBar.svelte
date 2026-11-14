@@ -4,7 +4,8 @@
 
   /**
    * Navegación principal, como NavigationSuiteScaffold: barra inferior en el móvil y
-   * carril lateral en pantallas anchas. Volver a pulsar la sección activa sube al
+   * carril lateral en pantallas anchas. En el móvil, solo las cuatro secciones de uso
+   * diario; Ajustes va arriba en Inicio y Explorar (SettingsButton), como en la app. Volver a pulsar la sección activa sube al
    * principio (o enfoca el buscador).
    */
   const items: { tab: Tab; label: string; icon: IconName }[] = [
@@ -23,7 +24,14 @@
   </a>
   {#each items as item (item.tab)}
     {@const active = nav.tab === item.tab && !settingsOpen}
-    <button class="item" class:active aria-current={active ? 'page' : undefined} onclick={() => nav.selectTab(item.tab)}>
+    <!-- En el móvil, Ajustes se abre desde una sección: esa sigue marcada mientras se está en él. -->
+    <button
+      class="item"
+      class:active
+      class:origin={nav.tab === item.tab && settingsOpen}
+      aria-current={active ? 'page' : undefined}
+      onclick={() => nav.selectTab(item.tab)}
+    >
       <span class="pill"><Icon name={item.icon} /></span>
       <span class="label">{item.label}</span>
     </button>
@@ -92,6 +100,21 @@
   .item.active .pill {
     background: rgb(255 106 71 / 0.22);
     color: var(--accent);
+  }
+
+  .settings {
+    display: none;
+  }
+
+  @media (max-width: 839px) {
+    .item.origin {
+      color: var(--text);
+    }
+
+    .item.origin .pill {
+      background: rgb(255 106 71 / 0.22);
+      color: var(--accent);
+    }
   }
 
   @media (min-width: 840px) {

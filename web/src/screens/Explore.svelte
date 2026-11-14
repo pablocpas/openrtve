@@ -3,6 +3,7 @@
   import ImageTile from '../components/ImageTile.svelte';
   import ItemCard from '../components/ItemCard.svelte';
   import Panels from '../components/Panels.svelte';
+  import SettingsButton from '../components/SettingsButton.svelte';
   import { isAbort, toLoadError, type LoadError } from '../lib/data/http';
   import { repository } from '../lib/data/repository';
   import { liveRow, type CatalogItem, type ExploreGroup } from '../lib/domain/models';
@@ -96,7 +97,10 @@
   });
 </script>
 
-<h1 class="screen-title">Explorar</h1>
+<div class="title-row">
+  <h1 class="screen-title">Explorar</h1>
+  <SettingsButton />
+</div>
 
 <div class="screen-body">
   {#if isLoading}
@@ -123,6 +127,17 @@
 </div>
 
 <style>
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: calc(var(--gutter) - 4px);
+  }
+
+  .title-row :global(.settings-btn) {
+    margin-top: 12px;
+  }
+
   section h2 {
     padding: 16px var(--gutter) 2px;
   }

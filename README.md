@@ -148,9 +148,10 @@ En Firefox de escritorio se usa como una web normal: Firefox no instala PWA.
 
 ### Qué incluye
 
-- Inicio, Buscar, Explorar, Mi lista y Ajustes, con barra inferior en el móvil y
-  panel lateral en pantallas anchas; fichas de programa y de vídeo con sus
-  pestañas; "Seguir viendo".
+- Inicio, Buscar, Explorar y Mi lista en la barra inferior del móvil (Ajustes,
+  con el engranaje de arriba en Inicio y Explorar, como en la app) y en un panel
+  lateral en pantallas anchas; fichas de programa y de vídeo con sus pestañas;
+  "Seguir viendo".
 - Reproductor con calidad, velocidad, audio y subtítulos, miniaturas al
   arrastrar, siguiente episodio, imagen en imagen, pantalla completa (apaisada en
   Android; en iPhone, la del propio sistema) y doble toque a los lados para saltar 10 s. Con teclado: espacio o

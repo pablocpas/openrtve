@@ -8,6 +8,7 @@
   import ImageTile from '../components/ImageTile.svelte';
   import ItemCard from '../components/ItemCard.svelte';
   import Panels from '../components/Panels.svelte';
+  import SettingsButton from '../components/SettingsButton.svelte';
   import TopBar from '../components/TopBar.svelte';
   import { isAbort, toLoadError, type LoadError } from '../lib/data/http';
   import { repository } from '../lib/data/repository';
@@ -286,6 +287,7 @@
 {:else}
   <header class="brandbar" class:hidden={scrolled && sections.length > 0}>
     <span class="brand">OpenRTVE</span>
+    <SettingsButton veil />
   </header>
 {/if}
 
@@ -476,15 +478,25 @@
     z-index: 10;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     height: 64px;
-    padding: 0 var(--gutter);
+    padding: 0 calc(var(--gutter) - 4px) 0 var(--gutter);
     background: linear-gradient(to bottom, rgb(0 0 0 / 0.65), transparent);
     pointer-events: none;
     transition: opacity 0.25s;
   }
 
+  /* La barra deja pasar los toques al hero, salvo el engranaje (y este tampoco si está oculta). */
+  .brandbar :global(.settings-btn) {
+    pointer-events: auto;
+  }
+
   .brandbar.hidden {
     opacity: 0;
+  }
+
+  .brandbar.hidden :global(.settings-btn) {
+    pointer-events: none;
   }
 
   .brand {
