@@ -104,6 +104,12 @@ class PlayerActivity : ComponentActivity() {
     private var title by mutableStateOf("")
     private var liveState by mutableStateOf<LiveState?>(null)
     private var menu by mutableStateOf<PlayerMenu?>(null)
+
+    /** Techo de calidad del vídeo actual, medido en automático (ver TrackOptions); se olvida al cambiar de vídeo. */
+    private var qualityCeiling: Int? = null
+
+    private fun buildMenu(player: Player): PlayerMenu =
+        buildPlayerMenu(this, player, settings.current.maxVideoHeight, qualityCeiling).also { qualityCeiling = it.qualityCeiling }
     private var sprite by mutableStateOf<PreviewSprite?>(null)
     /** Posición y fracción de la barra mientras el usuario arrastra. */
     private var scrub by mutableStateOf<Pair<Long, Float>?>(null)
@@ -141,7 +147,7 @@ class PlayerActivity : ComponentActivity() {
         }
 
         override fun onTracksChanged(tracks: Tracks) {
-            if (menu != null) controller?.let { menu = buildPlayerMenu(this@PlayerActivity, it) }
+            if (menu != null) controller?.let { menu = buildMenu(it) }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -191,11 +197,11 @@ class PlayerActivity : ComponentActivity() {
                     liveState = liveState,
                     onGoLive = { controller?.seekToDefaultPosition() },
                     menu = menu,
-                    onOpenMenu = { controller?.let { menu = buildPlayerMenu(this, it) } },
+                    onOpenMenu = { controller?.let { menu = buildMenu(it) } },
                     onSelectOption = { option ->
                         controller?.let { c ->
                             option.apply(c)
-                            menu = buildPlayerMenu(this, c)
+                            menu = buildMenu(c)
                         }
                     },
                     onCloseMenu = { menu = null },
@@ -462,6 +468,7 @@ class PlayerActivity : ComponentActivity() {
 
     private fun play(player: MediaController, item: MediaItem) {
         errorRes = null
+        qualityCeiling = null
         val resumeAt = request?.takeUnless { it.restart }?.historyKey
             ?.let { history.entryFor(it)?.takeIf { entry -> entry.inProgress }?.positionMs }
             ?: 0L

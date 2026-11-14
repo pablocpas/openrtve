@@ -1,6 +1,14 @@
 package es.openrtve.playback
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -53,6 +61,10 @@ import es.openrtve.domain.PreviewSprite
  * Panel de ajustes del reproductor, como el de RTVE Play: calidad, velocidad,
  * audio y subtítulos en una sola hoja. Panel lateral con filas enfocables, así
  * sirve igual para el táctil y para el mando.
+ *
+ * Atrás lo cierra a la primera: Compose usa Atrás para sacar el foco de su grupo
+ * antes que para volver, y con el fondo y la columna como niveles hacían falta
+ * tres o cuatro pulsaciones. Ni el fondo ni la columna reciben el foco.
  */
 @Composable
 internal fun PlayerSettingsPanel(menu: PlayerMenu, onSelect: (PlayerOption) -> Unit, onDismiss: () -> Unit) {
@@ -61,7 +73,13 @@ internal fun PlayerSettingsPanel(menu: PlayerMenu, onSelect: (PlayerOption) -> U
     Box(
         Modifier
             .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                if (event.key != Key.Back && event.key != Key.Escape) return@onPreviewKeyEvent false
+                if (event.type == KeyEventType.KeyUp) onDismiss()
+                true
+            }
             .background(Color.Black.copy(alpha = 0.45f))
+            .focusProperties { canFocus = false }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
     ) {
         Column(
@@ -72,6 +90,7 @@ internal fun PlayerSettingsPanel(menu: PlayerMenu, onSelect: (PlayerOption) -> U
                 .background(Color(0xF0141620))
                 .verticalScroll(rememberScrollState())
                 .padding(vertical = 16.dp)
+                .focusProperties { canFocus = false }
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
         ) {
             val sections = listOf(
@@ -103,23 +122,34 @@ private fun SectionTitle(title: String) {
     )
 }
 
+/** Con el mando, la fila enfocada va en blanco con texto oscuro, como en Google TV: se ve desde el sofá. */
 @Composable
 private fun OptionRow(option: PlayerOption, modifier: Modifier, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 8.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (focused) Color.White else Color.Transparent)
+            .clickable(interactionSource = interaction, indication = if (focused) null else LocalIndication.current, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
     ) {
         Text(
             text = option.label,
             style = MaterialTheme.typography.bodyLarge,
-            color = Color.White,
+            fontWeight = if (focused || option.selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (focused) Color(0xFF0B0C10) else Color.White,
             modifier = Modifier.weight(1f),
         )
         if (option.selected) {
-            Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(
+                Icons.Filled.Check,
+                contentDescription = null,
+                tint = if (focused) Color(0xFF0B0C10) else MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }

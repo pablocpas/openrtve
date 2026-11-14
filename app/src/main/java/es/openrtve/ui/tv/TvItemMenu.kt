@@ -16,6 +16,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,7 +39,8 @@ internal class TvOption(val label: String, val onClick: () -> Unit)
 /**
  * Menú contextual de TV, como el de Google TV: el título y una columna de botones.
  * Se abre con una pulsación larga de OK, así que el botón aún está pulsado al
- * aparecer: ver [ignoreHeldSelectKey].
+ * aparecer: ver [ignoreHeldSelectKey]. Atrás lo cierra a la primera (Compose usa
+ * Atrás antes para sacar el foco de su grupo).
  */
 @Composable
 internal fun TvOptionsDialog(title: String, options: List<TvOption>, onDismiss: () -> Unit) {
@@ -45,6 +51,11 @@ internal fun TvOptionsDialog(title: String, options: List<TvOption>, onDismiss: 
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier
                     .ignoreHeldSelectKey()
+                    .onPreviewKeyEvent { event ->
+                        if (event.key != Key.Back && event.key != Key.Escape) return@onPreviewKeyEvent false
+                        if (event.type == KeyEventType.KeyUp) onDismiss()
+                        true
+                    }
                     .background(MaterialTheme.colorScheme.surface, TvCardShape)
                     .padding(24.dp)
                     .width(360.dp),
