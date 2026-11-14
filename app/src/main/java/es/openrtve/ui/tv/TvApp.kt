@@ -85,6 +85,7 @@ fun TvApp(container: AppContainer, incomingLinks: Flow<String> = emptyFlow()) {
 
     val destination = nav.current
     ProvideClock { ProvideTvItemMenu(container.favorites, onOpenDetails = actions.openItem, onRemove = actions.removeFromMyList) {
+        TvUpdatePrompt(container.updates, onMessage = actions.showMessage)
         NavigationDrawer(
             drawerContent = {
                 // Al entrar en el menú desde el contenido, el foco va a la sección activa,

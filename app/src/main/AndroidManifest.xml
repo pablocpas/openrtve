@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Instalar las versiones nuevas desde GitHub Releases (AppUpdates): el sistema pide confirmación. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <uses-feature
         android:name="android.software.leanback"
@@ -90,6 +92,11 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <!-- Resultado de instalar una versión nueva: abre la confirmación del sistema. -->
+        <receiver
+            android:name=".data.UpdateInstallReceiver"
+            android:exported="false" />
 
         <!-- Media3 exige que el servicio sea visible para controladores externos;
              MediaSession valida cada conexión en tiempo de ejecución. -->

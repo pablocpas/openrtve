@@ -88,6 +88,7 @@ fun MobileApp(
     }
 
     ProvideClock {
+        UpdatePrompt(container.updates, onMessage = actions.showMessage)
         NavigationSuiteScaffold(
             navigationSuiteItems = { appNavigationItems(nav.tab, navigation::selectTab) },
             modifier = Modifier.fillMaxSize(),

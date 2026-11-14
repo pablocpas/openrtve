@@ -105,6 +105,17 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_version, versionName)) },
                 supportingContent = { Text(stringResource(R.string.settings_about_summary)) },
             )
+            ListItem(
+                colors = settingsItemColors(),
+                headlineContent = { Text(stringResource(R.string.settings_check_now)) },
+                supportingContent = { Text(stringResource(R.string.settings_check_now_summary)) },
+                modifier = Modifier.clickable(onClick = container.updates::checkNow),
+            )
+            SwitchRow(
+                title = stringResource(R.string.settings_check_updates),
+                summary = stringResource(R.string.settings_check_updates_summary),
+                checked = settings.checkUpdates,
+            ) { value -> viewModel.update { it.copy(checkUpdates = value) } }
         }
     }
 }

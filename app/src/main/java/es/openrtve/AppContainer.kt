@@ -2,6 +2,7 @@ package es.openrtve
 
 import android.content.Context
 import es.openrtve.data.AppSettings
+import es.openrtve.data.AppUpdates
 import es.openrtve.data.DeepLinkResolver
 import es.openrtve.data.DefaultCatalogRepository
 import es.openrtve.data.DrmTokenClient
@@ -33,6 +34,8 @@ class AppContainer(context: Context) {
         cache = documentCache,
     )
     val settings = AppSettings(context)
+    /** Versiones nuevas desde GitHub Releases; usa el cliente sin allowlist de RTVE con la suya propia. */
+    val updates = AppUpdates(context, mediaHttpClient, settings)
     val deepLinkResolver = DeepLinkResolver(catalogRepository)
     val watchHistory = WatchHistory(context.filesDir.resolve("watch-history.json"))
     val favorites = Favorites(context.filesDir.resolve("favorites.json"))

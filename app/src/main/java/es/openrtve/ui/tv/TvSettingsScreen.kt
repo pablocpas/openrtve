@@ -75,6 +75,10 @@ fun TvSettingsScreen(container: AppContainer, onMessage: (String) -> Unit) {
         TvSettingsLabel(stringResource(R.string.settings_about))
         Text(stringResource(R.string.settings_version, versionName), style = MaterialTheme.typography.bodyLarge)
         Text(stringResource(R.string.settings_about_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f))
+        Button(onClick = container.updates::checkNow) { Text(stringResource(R.string.settings_check_now)) }
+        TvSwitchRow(stringResource(R.string.settings_check_updates), stringResource(R.string.settings_check_updates_summary), settings.checkUpdates) { v ->
+            viewModel.update { it.copy(checkUpdates = v) }
+        }
     }
 }
 

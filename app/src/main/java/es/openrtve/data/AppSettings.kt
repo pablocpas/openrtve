@@ -17,6 +17,8 @@ data class Settings(
     val subtitlesByDefault: Boolean = false,
     /** Encadenar el siguiente episodio al terminar. */
     val autoplayNext: Boolean = true,
+    /** Al abrir la app, consultar en GitHub si hay una versión nueva (ver AppUpdates). */
+    val checkUpdates: Boolean = true,
 )
 
 /**
@@ -37,6 +39,7 @@ class AppSettings(context: Context) {
             putInt(KEY_MAX_HEIGHT, updated.maxVideoHeight)
             putBoolean(KEY_SUBTITLES, updated.subtitlesByDefault)
             putBoolean(KEY_AUTOPLAY, updated.autoplayNext)
+            putBoolean(KEY_CHECK_UPDATES, updated.checkUpdates)
         }
         mutableSettings.update { updated }
     }
@@ -46,6 +49,7 @@ class AppSettings(context: Context) {
         maxVideoHeight = prefs.getInt(KEY_MAX_HEIGHT, 0),
         subtitlesByDefault = prefs.getBoolean(KEY_SUBTITLES, false),
         autoplayNext = prefs.getBoolean(KEY_AUTOPLAY, true),
+        checkUpdates = prefs.getBoolean(KEY_CHECK_UPDATES, true),
     )
 
     private companion object {
@@ -54,5 +58,6 @@ class AppSettings(context: Context) {
         const val KEY_MAX_HEIGHT = "max_video_height"
         const val KEY_AUTOPLAY = "autoplay_next"
         const val KEY_SUBTITLES = "subtitles_by_default"
+        const val KEY_CHECK_UPDATES = "check_updates"
     }
 }

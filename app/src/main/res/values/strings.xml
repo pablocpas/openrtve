@@ -25,6 +25,21 @@
     <string name="settings_about">Acerca de</string>
     <string name="settings_version">Versión %1$s</string>
     <string name="settings_about_summary">Cliente independiente para el catálogo público de RTVE Play. No está afiliado a RTVE.</string>
+    <string name="settings_check_updates">Avisar de versiones nuevas</string>
+    <string name="settings_check_updates_summary">Al abrir la app, consulta GitHub como mucho cada 6 horas</string>
+    <string name="settings_check_now">Buscar actualizaciones</string>
+    <string name="settings_check_now_summary">Comprueba ahora si hay una versión nueva</string>
+    <string name="update_available_title">OpenRTVE %1$s disponible</string>
+    <string name="update_available_text">Hay una versión nueva (tienes la %1$s). Se descarga desde GitHub e Android te pedirá confirmación para instalarla.</string>
+    <string name="update_now">Actualizar</string>
+    <string name="update_later">Más tarde</string>
+    <string name="update_downloading">Descargando OpenRTVE %1$s…</string>
+    <string name="update_cancel">Cancelar</string>
+    <string name="update_up_to_date">Tienes la última versión</string>
+    <string name="update_checking">Buscando actualizaciones…</string>
+    <string name="update_check_failed">No se ha podido comprobar si hay versiones nuevas</string>
+    <string name="update_download_failed">No se ha podido descargar la actualización</string>
+    <string name="update_install_failed">No se ha podido instalar la actualización</string>
 
     <string name="explore_kids">Infantil</string>
     <string name="explore_topics">Temáticas</string>

@@ -63,7 +63,11 @@ de la Corporación de Radio y Televisión Española.
   `rtve.es/play/videos/...` abren la ficha o el directo; también desde
   "Compartir → OpenRTVE" en cualquier app.
 - **Ajustes**: imagen en imagen, calidad máxima,
-  reproducción automática, subtítulos por defecto y borrado de caché.
+  reproducción automática, subtítulos por defecto, borrado de caché y
+  actualizaciones.
+- **Se actualiza sola**: al abrirla, avisa si hay una versión nueva en
+  *Releases* y, con "Actualizar", la descarga, comprueba su SHA-256 y la instala
+  encima (Android pide confirmación). Ver [Actualizaciones](#actualizaciones).
 - **Rápida y ligera**: catálogo en caché con revalidación por ETag (la portada
   aparece al instante con la última copia); imágenes en las mismas variantes que
   pide la web oficial de RTVE, que su servicio ya tiene hechas y sirve al
@@ -118,6 +122,19 @@ canales, categorías ni filtros.
 Descarga el APK de la sección *Releases* e instálalo en el móvil o en la TV
 (en Android TV, por ejemplo con *Downloader* o `adb install`). La app detecta si
 está en una TV y abre la interfaz de TV aunque el launcher lance la de móvil.
+
+### Actualizaciones
+
+Desde la 0.7.1, la app consulta la última versión publicada en GitHub al abrirla
+(como mucho cada 6 horas) y, si hay una nueva, ofrece actualizar: descarga el APK
+de *Releases*, comprueba su tamaño y su SHA-256 y lo instala con el instalador del
+sistema, que pide confirmación (la primera vez, también permiso para instalar apps
+de OpenRTVE). Los datos se conservan. Si se elige "Más tarde", esa versión no se
+vuelve a ofrecer en tres días.
+
+Es la única conexión que no tiene que ver con ver RTVE: una petición a
+`api.github.com` y, al actualizar, la descarga desde GitHub. Se puede apagar en *Ajustes → Avisar de
+versiones nuevas*, y *Ajustes → Buscar actualizaciones* comprueba al momento.
 
 Enlaces: en Android 12 o superior, abrir un enlace `rtve.es` directamente en
 OpenRTVE requiere activarlo en *Ajustes → Aplicaciones → OpenRTVE → Abrir por
