@@ -16,6 +16,7 @@
   import { recallItem } from '../lib/ui/nav.svelte';
   import { PagedLoader } from '../lib/ui/paged.svelte';
   import { contentSections, sectionOpensDetails, videoFacts, type ProgramTab } from '../lib/ui/sections';
+  import { prefetchTabImages, whenIdle } from '../lib/ui/imagePrefetch';
   import { preloadPlayer } from '../lib/ui/playerPreload';
   import { collectionLinkText, errorText, htmlToParagraphs, videoMetaLine } from '../lib/ui/text';
 
@@ -114,6 +115,15 @@
   const tabs = $derived<ProgramTab[]>([...sections.map((s) => s.tab), ...(related.length ? (['RELATED'] as const) : [])]);
   let selectedTab = $state<ProgramTab | null>(null);
   const current = $derived(selectedTab && tabs.includes(selectedTab) ? selectedTab : tabs[0] ?? null);
+
+  // Las miniaturas de las otras pestañas se piden antes de abrirlas: RTVE tarda en servir cada una la primera vez.
+  $effect(() => {
+    const others = [...sections.map((s) => [s.tab, s.items] as const), ['RELATED', related] as const].filter(
+      ([tab, items]) => tab !== current && items.length > 0,
+    );
+    if (others.length === 0) return;
+    return whenIdle(() => others.forEach(([tab, items]) => prefetchTabImages(tab, items)));
+  });
   const activeSection = $derived(sections.find((s) => s.tab === current) ?? null);
 
   const resume = $derived.by(() => {

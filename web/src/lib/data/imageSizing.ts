@@ -39,3 +39,17 @@ export function sizedImage(url: string, widthPx: number, heightPx = 0): string |
   }
   return null;
 }
+
+/**
+ * Las versiones de una imagen pintada a [width] px CSS (1x, 1.5x y 2x), o ninguna si
+ * no es del servicio redimensionable. Las usan la tarjeta y la precarga, que así
+ * piden exactamente las mismas URL.
+ */
+export function artworkCandidates(url: string | null | undefined, ratio: number, width: number): { w: number; src: string }[] {
+  if (!url) return [];
+  const widths = [...new Set([1, 1.5, 2].map((dpr) => Math.min(MAX_WIDTH_PX, Math.ceil((width * dpr) / STEP_PX) * STEP_PX)))];
+  const sized = widths.map((w) => ({ w, src: sizedImage(url, w, Math.round(w / ratio)) }));
+  return sized.every((s) => s.src) ? (sized as { w: number; src: string }[]) : [];
+}
+
+export const toSrcset = (candidates: { w: number; src: string }[]) => candidates.map((c) => `${c.src} ${c.w}w`).join(', ');

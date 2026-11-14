@@ -100,7 +100,7 @@
   <button class="row action" onclick={clearCache}>
     <span class="text">
       <span class="title">Borrar caché</span>
-      <span class="summary">Catálogo guardado: {cacheBytes == null ? '…' : formatBytes(cacheBytes)}</span>
+      <span class="summary">Catálogo e imágenes guardados: {cacheBytes == null ? '…' : formatBytes(cacheBytes)}</span>
     </span>
   </button>
 

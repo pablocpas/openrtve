@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack, type Snippet } from 'svelte';
-  import { sizedImage } from '../lib/data/imageSizing';
+  import { artworkCandidates, toSrcset } from '../lib/data/imageSizing';
 
   /**
    * Imagen con proporción fija sobre un fondo neutro. Se pide al servicio de RTVE al
@@ -45,11 +45,7 @@
     }
   });
 
-  const candidates = $derived.by(() => {
-    const widths = [...new Set([1, 1.5, 2].map((dpr) => Math.min(1920, Math.ceil((width * dpr) / 160) * 160)))];
-    const sized = url ? widths.map((w) => ({ w, src: sizedImage(url, w, Math.round(w / ratio)) })) : [];
-    return sized.every((s) => s.src) ? (sized as { w: number; src: string }[]) : [];
-  });
+  const candidates = $derived(artworkCandidates(url, ratio, width));
 
   const src = $derived.by(() => {
     if (attempt === 0 && candidates.length) return candidates[0].src;
@@ -58,7 +54,7 @@
     return null;
   });
 
-  const srcset = $derived(attempt === 0 && candidates.length > 1 ? candidates.map((c) => `${c.src} ${c.w}w`).join(', ') : undefined);
+  const srcset = $derived(attempt === 0 && candidates.length > 1 ? toSrcset(candidates) : undefined);
 
   function onerror() {
     loaded = false;
