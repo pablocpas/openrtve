@@ -1,4 +1,4 @@
-import { isCollection, programStructure } from '../domain/classification';
+import { RtveTypes, isCollection, programStructure } from '../domain/classification';
 import { seasonsInDisplayOrder } from '../domain/episodeOrder';
 import { isAllowedUrl, sanitizeUrl } from '../domain/hostPolicy';
 import type {
@@ -335,7 +335,8 @@ export function parseProgram(raw: string): ProgramDetail {
     id,
     title: text(program, 'name', 'title', 'longTitle') ?? '',
     description: text(program, 'description', 'longDescription', 'promoDesc'),
-    imageUrl: firstAllowed(text(program, 'imgPortada', 'imgPortada2')) ?? derivedImage('p', id, 'imgPortada', BACKDROP_WIDTH),
+    // Por id, como la web oficial (`p/{id}/imgportada/?w=1600`), no el original a redimensionar.
+    imageUrl: derivedImage('p', id, 'imgPortada', BACKDROP_WIDTH),
     emission: text(program, 'emission'),
     seasons,
     webUrl: sanitizeUrl(text(program, 'htmlUrl')),
@@ -369,12 +370,10 @@ export function parseVideo(raw: string): VideoDetail {
   if (!video) throw new Error('El vídeo no tiene ficha');
   const item = toCatalogItem(video);
   if (!item) throw new Error('Vídeo sin id');
-  const previews = obj(video, 'previews');
   return {
     item,
-    backdropUrl:
-      firstAllowed(text(previews, 'horizontal2', 'horizontal'), text(video, 'thumbnail', 'imageSEO')) ??
-      derivedImage('v', item.id, 'horizontal2', BACKDROP_WIDTH),
+    // Por id, como la web oficial: sale de su caché en vez de redimensionar el original.
+    backdropUrl: derivedImage('v', item.id, videoLandscapeVariant(video, item.mediaSubtypeId === RtveTypes.MOVIE), BACKDROP_WIDTH),
     description: text(video, 'description', 'longDescription', 'shortDescription'),
     promo: text(video, 'promoDesc'),
     programTitle: text(obj(video, 'programInfo'), 'title'),
@@ -451,6 +450,8 @@ function toCatalogItem(item: Json, mediaFirst = false): CatalogItem | null {
   else if (kind === 'LIVE') subtitle = live?.category ?? null;
   const digits = (v: string | null) => v != null && /^\d+$/.test(v);
   const episode = int(media, 'episode');
+  const mediaSubtypeId = text(subtype, 'id') ?? (digits(subtypeValue) ? subtypeValue : null);
+  const film = mediaSubtypeId === RtveTypes.MOVIE;
 
   return {
     id,
@@ -458,7 +459,7 @@ function toCatalogItem(item: Json, mediaFirst = false): CatalogItem | null {
     assetId,
     title,
     subtitle,
-    imageUrl: landscapeImage(kind, id, media, item),
+    imageUrl: landscapeImage(kind, id, media, item, film),
     kind,
     posterUrl: posterImage(kind, id, media, item),
     squareUrl: squareImage(kind, id, media, item),
@@ -468,7 +469,7 @@ function toCatalogItem(item: Json, mediaFirst = false): CatalogItem | null {
     mediaTypeId: text(type, 'id') ?? (digits(typeValue) ? typeValue : null),
     mediaTypeName: text(type, 'name') ?? (typeValue != null && !digits(typeValue) ? typeValue : null),
     mediaSubtypeName: text(subtype, 'name') ?? (subtypeValue != null && !digits(subtypeValue) ? subtypeValue : null),
-    mediaSubtypeId: text(subtype, 'id') ?? (digits(subtypeValue) ? subtypeValue : null),
+    mediaSubtypeId,
     programShowsFragments: flag(programInfo, 'showFragments'),
     programTypeId: text(programInfo, 'programTypeId', 'programTypeID'),
     programType: text(programInfo, 'programType'),
@@ -607,10 +608,12 @@ function contentKind(contentType: string | null, editorialType: string | null, i
  * Imágenes por proporción: `imgPortada`, `thumb` y `previews.horizontal*` son 16:9;
  * `imgPoster`, `thumb_vertical` y `previews.vertical*` 2:3; `imgBackground`,
  * `thumb_square` y `previews.square*` 1:1; `imgCol` 1:2. Para vídeos y programas
- * el servicio por id devuelve siempre la variante pedida y admite `w=`.
+ * se usa el servicio por id, en la variante que pide la web oficial (imageSizing.ts):
+ * la imagen por defecto del vídeo, o su carátula editorial (`horizontal2`) si es una
+ * película o el feed dice que la tiene.
  */
-function landscapeImage(kind: ContentKind, id: string, media: Json, item: Json): string | null {
-  if (kind === 'VIDEO') return derivedImage('v', id, 'horizontal2', LANDSCAPE_WIDTH);
+function landscapeImage(kind: ContentKind, id: string, media: Json, item: Json, film: boolean): string | null {
+  if (kind === 'VIDEO') return derivedImage('v', id, videoLandscapeVariant(media, film), LANDSCAPE_WIDTH);
   if (kind === 'PROGRAM') return derivedImage('p', id, 'imgPortada', LANDSCAPE_WIDTH);
   return firstAllowed(
     text(item, 'thumb', 'imagen', 'imgPortada', 'imgPortada2', 'thumbnail'),
@@ -629,6 +632,11 @@ function squareImage(kind: ContentKind, id: string, media: Json, item: Json): st
   if (kind === 'PROGRAM') return derivedImage('p', id, 'imgBackground', SQUARE_WIDTH);
   if (kind === 'VIDEO') return null;
   return firstAllowed(text(item, 'thumb_square', 'imgBackground'), text(obj(media, 'previews'), 'square', 'square2'));
+}
+
+/** Carátula editorial si existe; si no, la imagen por defecto (un fotograma), como la web oficial. */
+function videoLandscapeVariant(media: Json, film: boolean): string {
+  return film || text(obj(media, 'previews'), 'horizontal2') ? 'horizontal2' : '';
 }
 
 function derivedImage(type: string, id: string, variant: string, width: number): string {

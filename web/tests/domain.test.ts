@@ -36,33 +36,41 @@ describe('enlaces de RTVE', () => {
 });
 
 describe('tamaño de las imágenes', () => {
-  it('se piden al tamaño en que se pintan, en escalones compartidos', () => {
-    expect(sizedImage('https://img.rtve.es/p/123?imgProgApi=imgPortada&w=960', 600, 338)).toBe(
-      'https://img.rtve.es/p/123?imgProgApi=imgPortada&w=640&h=360',
-    );
-    expect(sizedImage('https://img.rtve.es/v/9/horizontal2?w=960', 1080, 810)).toBe('https://img.rtve.es/v/9/horizontal2?w=1120&h=840');
+  // Las mismas variantes que pide la web oficial: casi siempre ya están en la caché de RTVE.
+  it('vídeos: 400 de ancho en tarjetas, 1600 en cabeceras; la carátula editorial se conserva', () => {
+    expect(sizedImage('https://img.rtve.es/v/9/?w=960', 340)).toBe('https://img.rtve.es/v/9/?w=400');
+    expect(sizedImage('https://img.rtve.es/v/9/horizontal?w=960', 200)).toBe('https://img.rtve.es/v/9/?w=400');
+    expect(sizedImage('https://img.rtve.es/v/9/horizontal2?w=960', 340)).toBe('https://img.rtve.es/v/9/horizontal2?w=400');
+    expect(sizedImage('https://img.rtve.es/v/9/horizontal2?w=1600', 1280)).toBe('https://img.rtve.es/v/9/horizontal2?w=1600');
+    expect(sizedImage('https://img.rtve.es/v/9/?w=1600', 1280)).toBe('https://img.rtve.es/v/9/?w=1600');
   });
 
-  it('el ancho tiene tope y sin alto se conserva la proporción', () => {
-    expect(sizedImage('https://img.rtve.es/v/9/vertical?w=480', 2560, -1)).toBe('https://img.rtve.es/v/9/vertical?w=1920');
+  it('pósters y cuadradas: 400 de alto', () => {
+    expect(sizedImage('https://img.rtve.es/v/9/vertical?w=480', 220)).toBe('https://img.rtve.es/v/9/vertical/?h=400');
+    expect(sizedImage('https://img.rtve.es/v/9/vertical2?w=480', 220)).toBe('https://img.rtve.es/v/9/vertical2/?h=400');
+    expect(sizedImage('https://img.rtve.es/p/123?imgProgApi=imgPoster&w=480', 220)).toBe('https://img.rtve.es/p/123/imgposter/?h=400');
+    expect(sizedImage('https://img.rtve.es/p/123?imgProgApi=imgBackground&w=480', 220)).toBe('https://img.rtve.es/p/123/imgbackground/?h=400');
   });
 
-  it('los originales pasan por el redimensionador', () => {
-    expect(sizedImage('https://img.rtve.es/imagenes/cine-de-siempre/1768405234614.jpg', 300, 169)).toBe(
-      'https://img.rtve.es/i/?w=320&h=180&i=https%3A%2F%2Fimg.rtve.es%2Fimagenes%2Fcine-de-siempre%2F1768405234614.jpg',
-    );
-    expect(sizedImage('https://img.rtve.es/imagenes/x/1.png?v=2', 1080, -1)).toBe(
-      'https://img.rtve.es/i/?w=1120&i=https%3A%2F%2Fimg.rtve.es%2Fimagenes%2Fx%2F1.png',
-    );
-    expect(sizedImage('https://img.rtve.es/i/?w=400&i=1665049167787.jpg', 480, 270)).toBe('https://img.rtve.es/i/?i=1665049167787.jpg&w=480&h=270');
+  it('programas: portada a 400 o 1600 y logo a 320', () => {
+    expect(sizedImage('https://img.rtve.es/p/123?imgProgApi=imgPortada&w=960', 340)).toBe('https://img.rtve.es/p/123/imgportada/?w=400');
+    expect(sizedImage('https://img.rtve.es/p/123?imgProgApi=imgPortada&w=1600', 1920)).toBe('https://img.rtve.es/p/123/imgportada/?w=1600');
+    expect(sizedImage('https://img.rtve.es/p/123?imgProgApi=logo', 120)).toBe('https://img.rtve.es/p/123/?w=320&imgProgApi=logo');
   });
 
-  it('los estáticos y otros hosts no se tocan', () => {
-    expect(sizedImage('https://img.rtve.es/resources/x/1.jpg', 300, 200)).toBeNull();
-    expect(sizedImage('https://img2.rtve.es/p/1?w=1', 300, 200)).toBeNull();
+  it('los originales pasan por el redimensionador con los mismos dos anchos', () => {
+    expect(sizedImage('https://img.rtve.es/imagenes/cine-de-siempre/1768405234614.jpg', 300)).toBe(
+      'https://img.rtve.es/i/?w=400&i=https%3A%2F%2Fimg.rtve.es%2Fimagenes%2Fcine-de-siempre%2F1768405234614.jpg',
+    );
+    expect(sizedImage('https://img.rtve.es/i/?w=400&i=1665049167787.jpg', 900)).toBe('https://img.rtve.es/i/?w=1600&i=1665049167787.jpg');
+  });
+
+  it('los estáticos, otros hosts y los /p/ con nombre de fichero no se tocan', () => {
+    expect(sizedImage('https://img.rtve.es/resources/x/1.jpg', 300)).toBeNull();
+    expect(sizedImage('https://img2.rtve.es/p/1?w=1', 300)).toBeNull();
     // RTVE responde 503 a `?w=` en estos y 404 desde su redimensionador.
-    expect(sizedImage('https://img.rtve.es/p/bluey_1028792.png', 300, 300)).toBeNull();
-    expect(sizedImage('https://img.rtve.es/p/1?w=1', 0, 0)).toBeNull();
+    expect(sizedImage('https://img.rtve.es/p/bluey_1028792.png', 300)).toBeNull();
+    expect(sizedImage('https://img.rtve.es/p/1?w=1', 0)).toBeNull();
   });
 });
 

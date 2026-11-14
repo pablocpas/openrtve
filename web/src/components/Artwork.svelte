@@ -1,13 +1,13 @@
 <script lang="ts">
   import { untrack, type Snippet } from 'svelte';
-  import { artworkCandidates, toSrcset } from '../lib/data/imageSizing';
+  import { sizedImage } from '../lib/data/imageSizing';
   import { nearScreen } from '../lib/ui/nearViewport';
 
   /**
-   * Imagen con proporción fija sobre un fondo neutro. Se pide al servicio de RTVE al
-   * tamaño en que se pinta ([width] en px CSS, con variantes para pantallas de alta
-   * densidad); si la versión redimensionada fallase, se pide el original, y si
-   * tampoco, [fallback]. El tamaño es una mejora, nunca el motivo de una tarjeta vacía.
+   * Imagen con proporción fija sobre un fondo neutro. Se pide al servicio de RTVE en la
+   * variante que usa la web oficial para ese ancho ([width] en px CSS; ver
+   * imageSizing.ts); si fallase, se pide el original, y si tampoco, [fallback]. El
+   * tamaño es una mejora, nunca el motivo de una tarjeta vacía.
    */
   let {
     url,
@@ -50,20 +50,19 @@
     }
   });
 
-  const candidates = $derived(artworkCandidates(url, ratio, width));
+  const sized = $derived(url ? sizedImage(url, width) : null);
 
   const src = $derived.by(() => {
-    if (attempt === 0 && candidates.length) return candidates[0].src;
+    if (attempt === 0 && sized) return sized;
     if (attempt <= 1 && url) return url;
     if (attempt <= 2 && fallback) return fallback;
     return null;
   });
 
-  const srcset = $derived(attempt === 0 && candidates.length > 1 ? toSrcset(candidates) : undefined);
 
   function onerror() {
     loaded = false;
-    if (attempt === 0 && candidates.length && url) attempt = 1;
+    if (attempt === 0 && sized && url) attempt = 1;
     else if (attempt <= 1 && fallback && fallback !== url) attempt = 2;
     else attempt = 3;
   }
@@ -73,8 +72,6 @@
   {#if src}
     <img
       {src}
-      {srcset}
-      sizes={srcset ? `${width}px` : undefined}
       alt=""
       loading={near ? 'eager' : 'lazy'}
       fetchpriority={eager ? 'high' : 'auto'}
