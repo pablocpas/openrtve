@@ -16,6 +16,7 @@
   import { recallItem } from '../lib/ui/nav.svelte';
   import { PagedLoader } from '../lib/ui/paged.svelte';
   import { contentSections, sectionOpensDetails, videoFacts, type ProgramTab } from '../lib/ui/sections';
+  import { preloadPlayer } from '../lib/ui/playerPreload';
   import { collectionLinkText, errorText, htmlToParagraphs, videoMetaLine } from '../lib/ui/text';
 
   /**
@@ -25,6 +26,9 @@
    * documental. Se puede reproducir antes de que llegue la ficha.
    */
   let { id, title: initialTitle, scroller }: { id: string; title: string; scroller: HTMLElement | undefined } = $props();
+
+  // Desde una ficha lo normal es reproducir: el reproductor se va preparando.
+  preloadPlayer();
 
   // Cada ficha se monta para un vídeo concreto: lo ya conocido se pinta sin esperar.
   let item = $state<CatalogItem>(untrack(() => recallItem(`video:${id}`) ?? referenceItem(id, 'VIDEO', initialTitle)));

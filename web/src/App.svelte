@@ -1,16 +1,52 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import NavBar from './components/NavBar.svelte';
   import Toast from './components/Toast.svelte';
   import { RtveUrls } from './lib/domain/models';
   import { openIncomingLink } from './lib/ui/actions';
   import { isPlayerRoute, nav, routeToPath, screenKey, type Entry } from './lib/ui/nav.svelte';
-  import Explore from './screens/Explore.svelte';
-  import Module from './screens/Module.svelte';
+  import { loadPlayerScreen } from './lib/ui/playerPreload';
   import Portada from './screens/Portada.svelte';
-  import Program from './screens/Program.svelte';
-  import Search from './screens/Search.svelte';
-  import Settings from './screens/Settings.svelte';
-  import Video from './screens/Video.svelte';
+
+  /*
+   * Solo la portada va en el arranque; el resto de pantallas son trozos aparte que se
+   * piden al necesitarlas y, en cuanto el navegador queda libre, todas: así arrancar
+   * cuesta menos y cambiar de pantalla sigue siendo instantáneo.
+   */
+  const lazyScreens = {
+    search: () => import('./screens/Search.svelte'),
+    explore: () => import('./screens/Explore.svelte'),
+    settings: () => import('./screens/Settings.svelte'),
+    module: () => import('./screens/Module.svelte'),
+    program: () => import('./screens/Program.svelte'),
+    video: () => import('./screens/Video.svelte'),
+  };
+  type LazyName = keyof typeof lazyScreens;
+  type LazyScreens = { [K in LazyName]?: Awaited<ReturnType<(typeof lazyScreens)[K]>>['default'] };
+
+  let screens = $state.raw<LazyScreens>({});
+  const requested = new Set<string>();
+
+  function need(name: string) {
+    if (!(name in lazyScreens) || requested.has(name)) return;
+    requested.add(name);
+    const key = name as LazyName;
+    lazyScreens[key]().then(
+      (module) => (screens = { ...screens, [key]: module.default }),
+      () => requested.delete(name),
+    );
+  }
+
+  $effect(() => {
+    for (const entry of nav.mounted) need(entry.route.name);
+  });
+
+  onMount(() => {
+    const prefetch = () => Object.keys(lazyScreens).forEach(need);
+    const idle = () => ('requestIdleCallback' in window ? requestIdleCallback(prefetch, { timeout: 5000 }) : setTimeout(prefetch, 2000));
+    if (document.readyState === 'complete') idle();
+    else window.addEventListener('load', idle, { once: true });
+  });
 
   /*
    * Contenedor de pantallas. Las de la cadena visible siguen montadas (con su scroll
@@ -19,7 +55,7 @@
    */
   const activeKey = $derived(screenKey(nav.background));
   const playerEntry = $derived(nav.current && isPlayerRoute(nav.current.route) ? nav.current : null);
-  const playerModule = $derived(playerEntry ? import('./screens/Player.svelte') : null);
+  const playerModule = $derived(playerEntry ? loadPlayerScreen() : null);
 
   const scrollers: Record<string, HTMLElement | undefined> = $state({});
 
@@ -58,26 +94,26 @@
       <div class="screen" class:hidden={key !== activeKey} inert={key !== activeKey || !!playerEntry} bind:this={scrollers[key]}>
         {#if entry.route.name === 'home'}
           <Portada url={RtveUrls.TV_HOME} isRoot {active} scroller={scrollers[key]} />
-        {:else if entry.route.name === 'search'}
-          <Search initialQuery={entry.route.query} {active} />
-        {:else if entry.route.name === 'explore'}
-          <Explore {active} scroller={scrollers[key]} />
-        {:else if entry.route.name === 'settings'}
-          <Settings />
+        {:else if entry.route.name === 'search' && screens.search}
+          <screens.search initialQuery={entry.route.query} {active} />
+        {:else if entry.route.name === 'explore' && screens.explore}
+          <screens.explore {active} scroller={scrollers[key]} />
+        {:else if entry.route.name === 'settings' && screens.settings}
+          <screens.settings />
         {:else if entry.route.name === 'portada'}
           <Portada url={entry.route.url} title={entry.route.title} {active} scroller={scrollers[key]} />
-        {:else if entry.route.name === 'module'}
-          <Module
+        {:else if entry.route.name === 'module' && screens.module}
+          <screens.module
             url={entry.route.url}
             presentation={entry.route.presentation}
             moduleType={entry.route.moduleType}
             title={entry.route.title}
             {active}
           />
-        {:else if entry.route.name === 'program'}
-          <Program id={entry.route.id} title={entry.route.title} scroller={scrollers[key]} />
-        {:else if entry.route.name === 'video'}
-          <Video id={entry.route.id} title={entry.route.title} scroller={scrollers[key]} />
+        {:else if entry.route.name === 'program' && screens.program}
+          <screens.program id={entry.route.id} title={entry.route.title} scroller={scrollers[key]} />
+        {:else if entry.route.name === 'video' && screens.video}
+          <screens.video id={entry.route.id} title={entry.route.title} scroller={scrollers[key]} />
         {/if}
       </div>
     {/each}

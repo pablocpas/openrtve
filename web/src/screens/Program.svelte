@@ -24,6 +24,7 @@
     suggestionLabel,
     type ProgramTab,
   } from '../lib/ui/sections';
+  import { preloadPlayer } from '../lib/ui/playerPreload';
   import { errorText, htmlToParagraphs, programMetaLine } from '../lib/ui/text';
 
   /**
@@ -32,6 +33,9 @@
    * grande reproduce, continúa o pasa al siguiente según el historial.
    */
   let { id, title: initialTitle, scroller }: { id: string; title: string; scroller: HTMLElement | undefined } = $props();
+
+  // Desde una ficha lo normal es reproducir: el reproductor se va preparando.
+  preloadPlayer();
 
   // Cada ficha se monta para un programa concreto: sus datos de partida no cambian.
   const known = untrack(() => recallItem(`program:${id}`));

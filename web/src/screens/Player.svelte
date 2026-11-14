@@ -9,6 +9,7 @@
   import { resolvePlayback, type PlaybackReady } from '../lib/domain/playback';
   import { messages } from '../lib/ui/messages.svelte';
   import { nav, recallItem, rememberItem } from '../lib/ui/nav.svelte';
+  import { loadShaka } from '../lib/ui/playerPreload';
   import { blockedText, formatClock, languageName } from '../lib/ui/text';
 
   /*
@@ -140,10 +141,15 @@
     setupMediaSession();
     loadExtras(decision.videoId);
 
-    const [lib, hasWidevine] = await Promise.all([
-      import('shaka-player/dist/shaka-player.compiled-es2021.js').then((m) => m.default),
-      decision.drmTokenUrl ? widevineAvailable() : Promise.resolve(false),
-    ]);
+    // Shaka, Widevine y la licencia a la vez: el token no espera a que llegue el reproductor.
+    const tokenUrl = decision.drmTokenUrl;
+    const drm = tokenUrl
+      ? widevineAvailable().then(async (has) => ({
+          hasWidevine: has,
+          licenseUrl: has ? await repository.widevineLicenseUrl(tokenUrl, extras.signal).catch(() => null) : null,
+        }))
+      : Promise.resolve({ hasWidevine: false, licenseUrl: null });
+    const [lib, { hasWidevine, licenseUrl }] = await Promise.all([loadShaka(), drm]);
     if (destroyed) return;
     shakaLib = lib;
     shakaLib.polyfill.installAll();
@@ -170,14 +176,6 @@
       usedFallback = true;
       await loadSource(decision.fallbackUri, null);
       return;
-    }
-    let licenseUrl: string | null = null;
-    if (decision.drmTokenUrl && hasWidevine) {
-      try {
-        licenseUrl = await repository.widevineLicenseUrl(decision.drmTokenUrl, extras.signal);
-      } catch {
-        licenseUrl = null;
-      }
     }
     if (destroyed) return;
     await loadSource(decision.uri, licenseUrl);
