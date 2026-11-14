@@ -4,6 +4,7 @@
   import { QUALITY_CHOICES, settings } from '../lib/data/settings.svelte';
   import { contentNotice } from '../lib/ui/contentNotice.svelte';
   import { messages } from '../lib/ui/messages.svelte';
+  import { rightsContactEmail, rightsContactUrl } from '../lib/ui/rightsContact';
   import { formatBytes } from '../lib/ui/text';
 
   /** Ajustes (SettingsScreen.kt): reproducción, almacenamiento y acerca de. */
@@ -119,6 +120,14 @@
       <span class="summary">Independencia del proyecto, origen de los vídeos y derechos de sus titulares</span>
     </span>
   </button>
+  <a class="row action" href={rightsContactUrl}>
+    <span class="text">
+      <span class="title">Derechos y solicitudes de retirada</span>
+      <span class="summary">
+        Escribe a {rightsContactEmail}, indicando el contenido afectado y el motivo de la solicitud.
+      </span>
+    </span>
+  </a>
 </div>
 
 <style>

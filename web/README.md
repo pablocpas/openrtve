@@ -26,6 +26,11 @@ vídeos y los derechos de sus titulares. Se recuerda durante la sesión de esa p
 y puede volver a abrirse desde **Ajustes → Aviso sobre los contenidos**. Un enlace
 directo a un vídeo no inicia el reproductor hasta cerrar el aviso.
 
+El aviso y **Ajustes → Derechos y solicitudes de retirada** muestran el correo de
+contacto del responsable del proyecto y abren un mensaje con el asunto y los campos
+para identificar el contenido y el motivo de la solicitud. Ambos usan el contacto
+de `src/lib/ui/rightsContact.ts`.
+
 ## Rendimiento
 
 Decisiones medidas que conviene no deshacer sin volver a medir:

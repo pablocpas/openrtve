@@ -1,5 +1,6 @@
 <script lang="ts">
   import { contentNotice } from '../lib/ui/contentNotice.svelte';
+  import { rightsContactEmail, rightsContactUrl } from '../lib/ui/rightsContact';
 
   let dialog = $state<HTMLDialogElement>();
   let continueButton: HTMLButtonElement;
@@ -32,6 +33,10 @@
     <p>
       Los contenidos y las marcas pertenecen a sus respectivos titulares. El acceso está sujeto a la disponibilidad y a las
       <a href="https://www.rtve.es/comunes/aviso_legal.html" target="_blank" rel="noopener noreferrer">condiciones de RTVE Play</a>.
+    </p>
+    <p>
+      Para cuestiones de derechos o solicitudes de retirada de enlaces, contacta con el responsable de OpenRTVE en
+      <a href={rightsContactUrl}>{rightsContactEmail}</a>, indicando el contenido afectado y el motivo de la solicitud.
     </p>
   </div>
   <div class="actions">
