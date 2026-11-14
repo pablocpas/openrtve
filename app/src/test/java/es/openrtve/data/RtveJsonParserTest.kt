@@ -290,7 +290,8 @@ class RtveJsonParserTest {
 
         assertEquals("La amiga estupenda", detail.title)
         assertEquals("Sábado a las 22:00", detail.emission)
-        assertEquals("https://img.rtve.es/imagenes/x.jpg", detail.imageUrl)
+        // Por id, como la web oficial: la variante ya está en la caché de RTVE.
+        assertEquals("https://img.rtve.es/p/178291?imgProgApi=imgPortada&w=1600", detail.imageUrl)
         assertEquals("136519", detail.programTypeId)
         assertTrue(detail.inEmission)
         assertFalse(detail.isComplete)
@@ -413,7 +414,8 @@ class RtveJsonParserTest {
         assertEquals(listOf(ContentKind.VIDEO, ContentKind.VIDEO, ContentKind.PROGRAM), result.map { it.kind })
         assertEquals("Etapa 1", result[0].title)
         assertEquals("Vuelta a España", result[0].subtitle)
-        assertEquals("https://img.rtve.es/v/1/horizontal2?w=960", result[0].imageUrl)
+        // Sin carátula editorial ni ser película: la imagen por defecto, como la web oficial.
+        assertEquals("https://img.rtve.es/v/1/?w=960", result[0].imageUrl)
         assertEquals("Telediario", result[2].title)
     }
 
@@ -555,7 +557,7 @@ class RtveJsonParserTest {
             fallbackTitle = "",
         ).items
 
-        assertEquals("https://img.rtve.es/v/1/horizontal2?w=960", items[0].imageUrl)
+        assertEquals("https://img.rtve.es/v/1/?w=960", items[0].imageUrl)
         assertEquals("https://img.rtve.es/v/1/vertical?w=480", items[0].posterUrl)
         assertEquals("https://img.rtve.es/p/2?imgProgApi=imgPoster&w=480", items[1].posterUrl)
         assertEquals("https://img.rtve.es/p/2?imgProgApi=imgBackground&w=480", items[1].squareUrl)
@@ -585,7 +587,8 @@ class RtveJsonParserTest {
         assertEquals("16368062", detail.item.playbackId)
         assertEquals("77590", detail.item.programId)
         assertEquals("Cine internacional", detail.programTitle)
-        assertEquals("https://img.rtve.es/h2.jpg", detail.backdropUrl)
+        // La carátula editorial de la película, por id (como la web oficial).
+        assertEquals("https://img.rtve.es/v/16368062/horizontal2?w=1600", detail.backdropUrl)
         assertEquals("https://img.rtve.es/v/16368062/vertical?w=480", detail.item.posterUrl)
         assertEquals(listOf("Emma Stone", "Olivia Colman"), detail.cast)
         assertEquals(listOf("Drama", "Comedia"), detail.genres)

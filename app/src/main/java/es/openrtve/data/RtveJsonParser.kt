@@ -10,6 +10,8 @@ import es.openrtve.domain.RowLayout
 import es.openrtve.domain.SearchResults
 import es.openrtve.domain.VideoDetail
 import es.openrtve.domain.ContentKind
+import es.openrtve.domain.RtveTypes
+import es.openrtve.domain.isMovie
 import es.openrtve.domain.HomeFeed
 import es.openrtve.domain.HomeLink
 import es.openrtve.domain.HomeRow
@@ -276,8 +278,10 @@ class RtveJsonParser(
             id = program.text("id") ?: throw IllegalArgumentException("Programa sin id"),
             title = program.text("name", "title", "longTitle") ?: "",
             description = program.text("description", "longDescription", "promoDesc"),
-            imageUrl = firstAllowed(program.text("imgPortada", "imgPortada2"))
-                ?: derivedImage("p", program.text("id").orEmpty(), "imgPortada", BACKDROP_WIDTH),
+            // Por id, como la web oficial (`p/{id}/imgportada/?w=1600`): sale de la caché de
+            // RTVE en vez de redimensionar el original (ver RtveImageSizing).
+            imageUrl = program.text("id")?.let { derivedImage("p", it, "imgPortada", BACKDROP_WIDTH) }
+                ?: firstAllowed(program.text("imgPortada", "imgPortada2")),
             emission = program.text("emission"),
             seasons = seasons,
             webUrl = program.text("htmlUrl")?.let(hostPolicy::sanitize),
@@ -362,6 +366,10 @@ class RtveJsonParser(
         val assetId = media.text("idAsset") ?: item.text("idAsset")
         val kind = contentKind(contentType, editorialType, nestedMedia != null, assetId)
         val live = if (kind == ContentKind.LIVE) liveInfo(item) else null
+        val mediaSubtypeId = subtype?.text("id") ?: subtypeValue?.takeIf { it.all(Char::isDigit) }
+        val mediaSubtypeName = subtype?.text("name") ?: subtypeValue?.takeUnless { it.all(Char::isDigit) }
+        // Como CatalogItem.isMovie, antes de tener el item.
+        val film = mediaSubtypeId == RtveTypes.MOVIE || mediaSubtypeName?.lowercase() in setOf("película", "pelicula")
         val subtitle = when {
             mediaTitle != null -> mediaTitle
             kind == ContentKind.VIDEO -> item.obj("programInfo")?.text("title")
@@ -375,7 +383,7 @@ class RtveJsonParser(
             assetId = assetId,
             title = title,
             subtitle = subtitle,
-            imageUrl = landscapeImage(kind, id, media, item),
+            imageUrl = landscapeImage(kind, id, media, item, film),
             kind = kind,
             posterUrl = posterImage(kind, id, media, item),
             squareUrl = squareImage(kind, id, media, item),
@@ -384,8 +392,8 @@ class RtveJsonParser(
             seasonId = media.text("temporadaId") ?: item.text("temporadaId"),
             mediaTypeId = type?.text("id") ?: typeValue?.takeIf { it.all(Char::isDigit) },
             mediaTypeName = type?.text("name") ?: typeValue?.takeUnless { it.all(Char::isDigit) },
-            mediaSubtypeName = subtype?.text("name") ?: subtypeValue?.takeUnless { it.all(Char::isDigit) },
-            mediaSubtypeId = subtype?.text("id") ?: subtypeValue?.takeIf { it.all(Char::isDigit) },
+            mediaSubtypeName = mediaSubtypeName,
+            mediaSubtypeId = mediaSubtypeId,
             programShowsFragments = programInfo?.flag("showFragments"),
             programTypeId = programInfo?.text("programTypeId", "programTypeID"),
             programType = programInfo?.text("programType"),
@@ -490,11 +498,10 @@ class RtveJsonParser(
         val video = root.obj("page")?.array("items")?.firstOrNull() as? JsonObject
             ?: throw IllegalArgumentException("El vídeo no tiene ficha")
         val item = toCatalogItem(video) ?: throw IllegalArgumentException("Vídeo sin id")
-        val previews = video.obj("previews")
         return VideoDetail(
             item = item,
-            backdropUrl = firstAllowed(previews?.text("horizontal2", "horizontal"), video.text("thumbnail", "imageSEO"))
-                ?: derivedImage("v", item.id, "horizontal2", BACKDROP_WIDTH),
+            // Por id, como la web oficial: sale de la caché de RTVE (ver RtveImageSizing).
+            backdropUrl = derivedImage("v", item.id, videoLandscapeVariant(video, item.isMovie), BACKDROP_WIDTH),
             description = video.text("description", "longDescription", "shortDescription"),
             promo = video.text("promoDesc"),
             programTitle = video.obj("programInfo")?.text("title"),
@@ -543,11 +550,13 @@ class RtveJsonParser(
      * Imágenes por proporción, medidas el 12-09-2026: `imgPortada`, `thumb` y
      * `previews.horizontal*` son 16:9; `imgPoster`, `thumb_vertical` y
      * `previews.vertical*` 2:3; `imgBackground`, `thumb_square` y `previews.square*`
-     * 1:1; `imgCol` 1:2 e `imgBanner` 4:1. Para vídeos y programas el
-     * servicio por id devuelve siempre la variante pedida y admite `w=`.
+     * 1:1; `imgCol` 1:2 e `imgBanner` 4:1. Para vídeos y programas se usa el
+     * servicio por id, en la variante que pide la web oficial (RtveImageSizing): la
+     * imagen por defecto del vídeo, o su carátula editorial (`horizontal2`) si es una
+     * película o el feed dice que la tiene.
      */
-    private fun landscapeImage(kind: ContentKind, id: String, media: JsonObject, item: JsonObject): String? = when (kind) {
-        ContentKind.VIDEO -> derivedImage("v", id, "horizontal2", LANDSCAPE_WIDTH)
+    private fun landscapeImage(kind: ContentKind, id: String, media: JsonObject, item: JsonObject, film: Boolean): String? = when (kind) {
+        ContentKind.VIDEO -> derivedImage("v", id, videoLandscapeVariant(media, film), LANDSCAPE_WIDTH)
         ContentKind.PROGRAM -> derivedImage("p", id, "imgPortada", LANDSCAPE_WIDTH)
         else -> firstAllowed(
             item.text("thumb", "imagen", "imgPortada", "imgPortada2", "thumbnail"),
@@ -573,6 +582,10 @@ class RtveJsonParser(
 
     private fun firstAllowed(vararg candidates: String?): String? =
         candidates.firstNotNullOfOrNull { it?.let(hostPolicy::sanitize) }
+
+    /** Carátula editorial si existe; si no, la imagen por defecto (un fotograma), como la web oficial. */
+    private fun videoLandscapeVariant(media: JsonObject, film: Boolean): String =
+        if (film || media.obj("previews")?.text("horizontal2") != null) "horizontal2" else ""
 
     private fun derivedImage(type: String, id: String, variant: String?, width: Int): String = when (type) {
         "p" -> "$IMAGE_SERVICE/p/$id?imgProgApi=$variant&w=$width"
