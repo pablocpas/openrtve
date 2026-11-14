@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack, type Snippet } from 'svelte';
   import { artworkCandidates, toSrcset } from '../lib/data/imageSizing';
+  import { nearScreen } from '../lib/ui/nearViewport';
 
   /**
    * Imagen con proporción fija sobre un fondo neutro. Se pide al servicio de RTVE al
@@ -29,6 +30,10 @@
     class?: string;
     children?: Snippet;
   } = $props();
+
+  // Diferida hasta que se acerca a la pantalla (una pantalla antes de verse): entonces se
+  // pide ya, sin esperar a que el navegador decida, que en Firefox es al asomar.
+  let near = $state(untrack(() => eager));
 
   // 0 = versión redimensionada, 1 = original, 2 = respaldo, 3 = nada.
   let attempt = $state(0);
@@ -64,14 +69,14 @@
   }
 </script>
 
-<div class="artwork {className}" class:rounded style:aspect-ratio={ratio}>
+<div class="artwork {className}" class:rounded style:aspect-ratio={ratio} use:nearScreen={() => (near = true)}>
   {#if src}
     <img
       {src}
       {srcset}
       sizes={srcset ? `${width}px` : undefined}
       alt=""
-      loading={eager ? 'eager' : 'lazy'}
+      loading={near ? 'eager' : 'lazy'}
       fetchpriority={eager ? 'high' : 'auto'}
       decoding="async"
       class:loaded

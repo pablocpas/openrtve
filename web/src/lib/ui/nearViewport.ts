@@ -75,3 +75,12 @@ export function nearViewport(node: Element, params: Params) {
     destroy: stop,
   };
 }
+
+/**
+ * Acción de Svelte para lo que vive dentro de una pantalla (`.screen`, la que hace
+ * scroll): avisa una vez cuando se acerca. Firefox y Safari no adelantan la carga de
+ * las imágenes diferidas dentro de un contenedor con scroll; esto sí, igual en todos.
+ */
+export function nearScreen(node: Element, onnear: Callback) {
+  return nearViewport(node, { root: node.closest('.screen'), onnear: () => onnear() });
+}
