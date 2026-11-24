@@ -5,7 +5,8 @@
 
 export const RtveUrls = {
   TV_HOME: 'https://www.rtve.es/play/index_apps.json',
-  REMOTE_CONFIG: 'https://www.rtve.es/m/configs/rtve_play/2026/estructura2.json',
+  /** La que lee la app oficial de móvil desde la 8.9 (`Calls.ESTRUCTURA_URL`); `estructura2.json` ya no se actualiza. */
+  REMOTE_CONFIG: 'https://www.rtve.es/m/configs/rtve_play/2026/estructuraApple.json',
   /** La que lee la app oficial de Android TV: su propio menú y sus propias imágenes. */
   REMOTE_CONFIG_TV: 'https://www.rtve.es/m/configs/rtve_play/2026/estructuraAndroidTV2.json',
   QUICK_SEARCHES: 'https://www.rtve.es/m/configs/buscador/predefinidos.json',

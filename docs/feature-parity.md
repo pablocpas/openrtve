@@ -187,12 +187,14 @@ son objetivos del nuevo producto, no métricas extraídas de RTVE Play.
 
 ## Configuración por formato
 
-La app móvil (`rtve.tablet.android`) lee `estructura2.json`; la de Android TV
+La app móvil (`rtve.tablet.android` 8.9.1) lee `estructuraApple.json`
+(`Calls.ESTRUCTURA_URL`); `estructura2.json` se quedó atrás: el 24-11-2026 no
+traía ARTE.TV, que el menú oficial ya mostraba. La de Android TV
 (`com.rtve.androidtv` 8.1.9) lee `estructuraAndroidTV2.json`, solo con el árbol
 `television`: menú distinto (añade `portada4k`, Cuéntame y Arxiu Catalunya;
 no trae canales temáticos, territoriales ni Participa), parrilla con Catalunya
-y Canarias y otro conjunto de `canalestematicos`. OpenRTVE usa hoy
-`estructura2.json` en ambos formatos.
+y Canarias y otro conjunto de `canalestematicos`. OpenRTVE lee la de cada
+formato y usa la otra como reserva de imágenes del menú.
 
 El árbol `radio` solo existe en `estructura2.json` y RTVE Play no lo pinta en
 ninguna versión: el catálogo de audio vive en la app RTVE Audio

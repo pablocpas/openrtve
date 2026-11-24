@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sizedImage } from '../src/lib/data/imageSizing';
-import { parseMadridTime } from '../src/lib/data/parser';
+import { exploreImageFor, parseExplore, parseExploreImages, parseMadridTime } from '../src/lib/data/parser';
 import { parseDeepLink } from '../src/lib/domain/deepLink';
 import { episodeOrder } from '../src/lib/domain/episodeOrder';
 import { isAllowedUrl, sanitizeUrl } from '../src/lib/domain/hostPolicy';
@@ -137,5 +137,22 @@ describe('horas del feed', () => {
     expect(new Date(parseMadridTime('15-01-2026 16:10:00')!).toISOString()).toBe('2026-01-15T15:10:00.000Z');
     expect(new Date(parseMadridTime('15-07-2026 16:10:00')!).toISOString()).toBe('2026-07-15T14:10:00.000Z');
     expect(parseMadridTime('mañana')).toBeNull();
+  });
+});
+
+describe('imágenes de reserva del menú', () => {
+  it('se buscan por portada y, si la otra configuración la enlaza distinto, por nombre', () => {
+    const tv = parseExploreImages(`{"television":{"menuBloques":[{"menuItems":[
+      {"title":"ARTE","tipo":"portada","imgBackground":"https://img.rtve.es/arte.jpg","urlContent":"https://www.rtve.es/play/drs/tt/portada/index_apps.json"},
+      {"title":"CINE","tipo":"portada","imgBackground":"https://img.rtve.es/cine.jpg","urlContent":"https://www.rtve.es/play/cine/index_apps.json"}
+    ]}]}}`);
+    const [arte, cine, series] = parseExplore(`{"television":{"menuBloques":[{"menuItems":[
+      {"title":"ARTE.TV","tipo":"portada","logo":"https://img.rtve.es/arte.png","urlContent":"https://www.rtve.es/play/canal-arte/index_apps.json"},
+      {"title":"CINE","tipo":"portada","urlContent":"https://www.rtve.es/play/cine/index_apps.json"},
+      {"title":"SERIES","tipo":"portada","urlContent":"https://www.rtve.es/play/series/index_apps.json"}
+    ]}]}}`)[0].categories;
+    expect(exploreImageFor(tv, arte)).toBe('https://img.rtve.es/arte.jpg');
+    expect(exploreImageFor(tv, cine)).toBe('https://img.rtve.es/cine.jpg');
+    expect(exploreImageFor(tv, series)).toBeNull();
   });
 });

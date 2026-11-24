@@ -63,7 +63,7 @@ data class Page<T>(
 
 | Operación | Método y plantilla | Evidencia | Resultado |
 |---|---|---|---|
-| Configuración | `GET https://www.rtve.es/m/configs/rtve_play/2026/estructura2.json` | HTTP/APK | Flags, menús, portadas, fuentes, parrillas, anuncios y versión |
+| Configuración | `GET https://www.rtve.es/m/configs/rtve_play/2026/estructuraApple.json` | HTTP/APK | Flags, menús, portadas, fuentes, parrillas, anuncios y versión |
 | Locale | `GET https://includesweb.rtve.es/locale.json` | APK | Código de localización; fallback a locale del dispositivo |
 | Portada TV | `GET https://www.rtve.es/play/index_apps.json` | HTTP | `CustomHome` con `rows` |
 | Portada radio | `GET https://www.rtve.es/play/radio/index_apps.json` | HTTP | `CustomHome` con `rows` |

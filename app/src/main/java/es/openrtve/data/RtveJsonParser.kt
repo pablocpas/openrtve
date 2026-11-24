@@ -37,6 +37,24 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 
+/**
+ * Imágenes del menú de una configuración, de reserva para la otra. Se busca por
+ * portada y, si cada configuración enlaza la suya, por nombre: el 24-11-2026 la de
+ * móvil traía "ARTE.TV" sin imagen y la de TV "ARTE", con foto y otra URL.
+ */
+class ExploreImages(
+    private val byUrl: Map<String, String> = emptyMap(),
+    private val byName: Map<String, String> = emptyMap(),
+) {
+    fun forCategory(category: ExploreCategory): String? =
+        byUrl[category.contentUrl] ?: byName[exploreName(category.title)]
+}
+
+/** Nombre de una entrada del menú sin mayúsculas ni el dominio de la marca ("ARTE.TV" -> "arte"). */
+internal fun exploreName(title: String): String = title.trim().lowercase().replace(BRAND_DOMAIN, "")
+
+private val BRAND_DOMAIN = Regex("""\.[a-z]{2,3}$""")
+
 class RtveJsonParser(
     private val json: Json = Json { ignoreUnknownKeys = true },
     private val hostPolicy: RtveHostPolicy = RtveHostPolicy(),
@@ -177,11 +195,14 @@ class RtveJsonParser(
         }
     }
 
-    /** Imagen de cada portada del menú, por su URL; sirve de reserva para la otra configuración. */
-    fun parseExploreImages(raw: String): Map<String, String> = parseExplore(raw)
-        .flatMap { it.categories }
-        .mapNotNull { category -> category.imageUrl?.let { category.contentUrl to it } }
-        .toMap()
+    /** Imagen de cada portada del menú; sirve de reserva para la otra configuración. */
+    fun parseExploreImages(raw: String): ExploreImages {
+        val withImage = parseExplore(raw).flatMap { it.categories }.filter { it.imageUrl != null }
+        return ExploreImages(
+            byUrl = withImage.associate { it.contentUrl to it.imageUrl!! },
+            byName = withImage.distinctBy { exploreName(it.title) }.associate { exploreName(it.title) to it.imageUrl!! },
+        )
+    }
 
     /**
      * Las portadas directas de un bloque forman un grupo sin título (el nombre del

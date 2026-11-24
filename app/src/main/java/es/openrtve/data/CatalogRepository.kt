@@ -113,13 +113,13 @@ class DefaultCatalogRepository(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
-            emptyMap()
+            ExploreImages()
         }
         return groups.copy(
             value = groups.value.map { group ->
                 group.copy(
                     categories = group.categories.map { category ->
-                        category.copy(fallbackImageUrl = fallbacks[category.contentUrl]?.takeIf { it != category.imageUrl })
+                        category.copy(fallbackImageUrl = fallbacks.forCategory(category)?.takeIf { it != category.imageUrl })
                     },
                 )
             },

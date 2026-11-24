@@ -215,6 +215,27 @@ class RtveJsonParserTest {
     }
 
     @Test
+    fun `menu fallback images match by portada and, failing that, by brand name`() {
+        val tv = parser.parseExploreImages(
+            """{"television":{"menuBloques":[{"menuItems":[
+              {"title":"ARTE","tipo":"portada","imgBackground":"https://img.rtve.es/arte.jpg","urlContent":"https://www.rtve.es/play/drs/tt/portada/index_apps.json"},
+              {"title":"CINE","tipo":"portada","imgBackground":"https://img.rtve.es/cine.jpg","urlContent":"https://www.rtve.es/play/cine/index_apps.json"}
+            ]}]}}""",
+        )
+        val (arte, cine, series) = parser.parseExplore(
+            """{"television":{"menuBloques":[{"menuItems":[
+              {"title":"ARTE.TV","tipo":"portada","logo":"https://img.rtve.es/arte.png","urlContent":"https://www.rtve.es/play/canal-arte/index_apps.json"},
+              {"title":"CINE","tipo":"portada","urlContent":"https://www.rtve.es/play/cine/index_apps.json"},
+              {"title":"SERIES","tipo":"portada","urlContent":"https://www.rtve.es/play/series/index_apps.json"}
+            ]}]}}""",
+        ).single().categories
+
+        assertEquals("https://img.rtve.es/arte.jpg", tv.forCategory(arte))
+        assertEquals("https://img.rtve.es/cine.jpg", tv.forCategory(cine))
+        assertNull(tv.forCategory(series))
+    }
+
+    @Test
     fun `collection is flattened and last multimedia becomes playable`() {
         val result = parser.parseModule(
             raw = """

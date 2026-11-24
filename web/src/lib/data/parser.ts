@@ -231,10 +231,36 @@ function withChannelsTogether(groups: ExploreGroup[], channelGroups: Set<string>
 }
 
 /** Imagen de cada portada del menú, por su URL; sirve de reserva para la otra configuración. */
-export function parseExploreImages(raw: string): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const c of parseExplore(raw).flatMap((g) => g.categories)) if (c.imageUrl) map.set(c.contentUrl, c.imageUrl);
-  return map;
+export function parseExploreImages(raw: string): ExploreImages {
+  const byUrl = new Map<string, string>();
+  const byName = new Map<string, string>();
+  for (const c of parseExplore(raw).flatMap((g) => g.categories)) {
+    if (!c.imageUrl) continue;
+    byUrl.set(c.contentUrl, c.imageUrl);
+    if (!byName.has(exploreName(c.title))) byName.set(exploreName(c.title), c.imageUrl);
+  }
+  return { byUrl, byName };
+}
+
+/**
+ * Imágenes del menú de una configuración, de reserva para la otra. Se busca por
+ * portada y, si cada configuración enlaza la suya, por nombre: el 24-11-2026 la de
+ * móvil traía "ARTE.TV" sin imagen y la de TV "ARTE", con foto y otra URL.
+ */
+export interface ExploreImages {
+  byUrl: Map<string, string>;
+  byName: Map<string, string>;
+}
+
+export const NO_EXPLORE_IMAGES: ExploreImages = { byUrl: new Map(), byName: new Map() };
+
+export function exploreImageFor(images: ExploreImages, category: ExploreCategory): string | null {
+  return images.byUrl.get(category.contentUrl) ?? images.byName.get(exploreName(category.title)) ?? null;
+}
+
+/** Nombre de una entrada del menú sin mayúsculas ni el dominio de la marca ("ARTE.TV" -> "arte"). */
+export function exploreName(title: string): string {
+  return title.trim().toLowerCase().replace(/\.[a-z]{2,3}$/, '');
 }
 
 function exploreGroups(isKids: boolean, items: unknown[] | null, clanPortada: string | null): ExploreGroup[] {

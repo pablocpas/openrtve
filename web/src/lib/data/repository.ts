@@ -141,7 +141,7 @@ export const repository = {
   /** Menú de Explorar, con las imágenes de la configuración de TV como reserva. */
   async loadExplore(options?: LoadOptions): Promise<CatalogLoad<ExploreGroup[]>> {
     const groups = await loadDocument(RtveUrls.REMOTE_CONFIG, CONFIG, parser.parseExplore, options);
-    let fallbacks = new Map<string, string>();
+    let fallbacks = parser.NO_EXPLORE_IMAGES;
     try {
       fallbacks = (await loadDocument(RtveUrls.REMOTE_CONFIG_TV, CONFIG, parser.parseExploreImages, { signal: options?.signal })).value;
     } catch (error) {
@@ -152,7 +152,7 @@ export const repository = {
       value: groups.value.map((group) => ({
         ...group,
         categories: group.categories.map((category) => {
-          const fallback = fallbacks.get(category.contentUrl);
+          const fallback = parser.exploreImageFor(fallbacks, category);
           return { ...category, fallbackImageUrl: fallback && fallback !== category.imageUrl ? fallback : null };
         }),
       })),
