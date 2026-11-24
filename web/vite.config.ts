@@ -65,13 +65,18 @@ function checkStartupBudget(outDir: string, startup: string[]) {
   }
 }
 
-/** Lo mismo que hace la función de Cloudflare (functions/rtve-proxy/recomsys), para desarrollo. */
+/** Lo mismo que hacen las funciones de Cloudflare (functions/rtve-proxy/), para desarrollo. */
 const rtveProxy = {
   '/rtve-proxy/recomsys': {
     target: 'https://recomsys.rtve.es',
     changeOrigin: true,
     rewrite: (path: string) => path.replace(/^\/rtve-proxy\/recomsys/, ''),
     headers: { Origin: 'https://www.rtve.es', Referer: 'https://www.rtve.es/' },
+  },
+  '/rtve-proxy/portada': {
+    target: 'https://www.rtve.es',
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/rtve-proxy\/portada/, ''),
   },
 };
 

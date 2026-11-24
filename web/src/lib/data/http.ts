@@ -37,12 +37,24 @@ const TIMEOUT_MS = 15_000;
  */
 const PROXIED_HOSTS: Record<string, string> = { 'recomsys.rtve.es': 'rtve-proxy/recomsys' };
 
-/** URL que realmente se pide: la misma o, para los hosts sin CORS, la del reenvío. */
-function requestUrl(url: string): { href: string; proxied: boolean } {
+/**
+ * Portadas de sección (`www.rtve.es/play/<sección>/index_apps.json`): RTVE pone CORS
+ * en unas y no en otras. Se piden directamente y, si el navegador las bloquea, por
+ * `functions/rtve-proxy/portada/`; las bloqueadas se recuerdan para no repetir el intento.
+ */
+const PORTADA_PATH = /^\/play(\/[a-z0-9-]+)+\/index_apps\.json$/;
+const blockedPortadas = new Set<string>();
+
+/** Reenvío de la propia web para una URL de RTVE; `always` si el directo nunca funciona. */
+function proxyFor(url: string): { href: string; always: boolean } | null {
+  if (typeof document === 'undefined') return null;
   const parsed = new URL(url);
   const prefix = PROXIED_HOSTS[parsed.hostname];
-  if (!prefix || typeof document === 'undefined') return { href: url, proxied: false };
-  return { href: new URL(`./${prefix}${parsed.pathname}${parsed.search}`, document.baseURI).href, proxied: true };
+  if (prefix) return { href: new URL(`./${prefix}${parsed.pathname}${parsed.search}`, document.baseURI).href, always: true };
+  if (parsed.hostname === 'www.rtve.es' && !parsed.search && PORTADA_PATH.test(parsed.pathname)) {
+    return { href: new URL(`./rtve-proxy/portada${parsed.pathname}`, document.baseURI).href, always: blockedPortadas.has(url) };
+  }
+  return null;
 }
 
 export interface FetchOptions {
@@ -63,12 +75,25 @@ export interface FetchOptions {
  */
 export async function getText(url: string, options: FetchOptions = {}): Promise<string> {
   requireAllowed(url);
+  const proxy = proxyFor(url);
+  if (proxy?.always) return fetchText(proxy.href, options, true);
+  try {
+    return await fetchText(url, options, false);
+  } catch (error) {
+    // Sin CORS, el navegador da el mismo TypeError que sin red: se prueba el reenvío.
+    if (!proxy || !(error instanceof TypeError) || (typeof navigator !== 'undefined' && navigator.onLine === false)) throw error;
+    const text = await fetchText(proxy.href, options, true);
+    blockedPortadas.add(url);
+    return text;
+  }
+}
+
+async function fetchText(href: string, options: FetchOptions, proxied: boolean): Promise<string> {
   const timeout = AbortSignal.timeout(TIMEOUT_MS);
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
-  const target = requestUrl(url);
   let response: Response;
   try {
-    response = await fetch(target.href, {
+    response = await fetch(href, {
       signal,
       credentials: 'omit',
       referrerPolicy: 'no-referrer',
@@ -80,6 +105,6 @@ export async function getText(url: string, options: FetchOptions = {}): Promise<
   }
   if (!response.ok) throw new HttpStatusError(response.status);
   // Las redirecciones también deben quedarse en RTVE.
-  if (response.url && !target.proxied) requireAllowed(response.url);
+  if (response.url && !proxied) requireAllowed(response.url);
   return response.text();
 }
